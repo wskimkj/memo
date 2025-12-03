@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --card: rgba(255,255,255,0.55);
+  --card-2: rgba(255,255,255,0.42);
+  --border: rgba(255,255,255,0.45);
+  --accent: #8b5cf6;
+  --muted: #6b7280;
+}
+
+html,body,#root{
+  height:100%;
+}
+
+body{
+  @apply bg-gradient-to-br from-lavender-50 to-white;
+  font-family: Inter, "Noto Sans KR", system-ui, -apple-system;
+  color: #1f1f2e;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+.glass {
+  background: var(--card);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(80,60,130,0.12);
+}
+
+.badge {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:22px;height:22px;
+  background: linear-gradient(90deg,#ff6b8a,#8b5cf6);
+  color:white;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+  box-shadow:0 6px 14px rgba(139,92,246,0.18);
+}
+
+.input {
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius:10px;
+  padding:10px;
+}
+
+.sticky {
+  background: linear-gradient(180deg,#fff9e6,#fff6d6);
+  border-radius:12px;
+  padding:10px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+}
