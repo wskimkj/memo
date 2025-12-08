@@ -16,7 +16,7 @@ export default function MemoBoard({
   const draftEditorRef = useRef(null);
 
   // 실제 그룹 목록 = 저장된 순서 + memos 키들의 합집합
-  const allMemoGroups = Object.keys(memos);
+  const allMemoGroups = Object.keys(memos || {});
   const groups = Array.from(
     new Set([...(groupsOrder || []), ...allMemoGroups])
   );
@@ -193,9 +193,7 @@ export default function MemoBoard({
       {/* 상단 타이틀 */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-sm font-semibold text-gray-800">
-            메모 보드
-          </h2>
+          <h2 className="text-sm font-semibold text-gray-800">메모 보드</h2>
           <p className="text-[11px] text-gray-400">
             스티커 메모 느낌으로 가볍게 적고, 그룹으로 정리해보세요.
           </p>
@@ -209,7 +207,7 @@ export default function MemoBoard({
         </div>
       </div>
 
-      {/* 클립보드 상태 (복사/잘라내기) */}
+      {/* 클립보드 상태 */}
       {clipboardMemo && (
         <div className="mb-3 flex items-center justify-between rounded-xl border border-dashed border-amber-300/80 bg-amber-50/70 px-3 py-2 text-[11px] text-amber-800">
           <span>
@@ -258,8 +256,10 @@ export default function MemoBoard({
               >
                 {g}
               </button>
+
+              {/* Fragment 대신 div 사용해서 에러 방지 */}
               {activeGroup === g && (
-                <>
+                <div className="flex items-center gap-0.5">
                   <button
                     onClick={() => moveGroup(g, -1)}
                     className="text-[11px] text-gray-400 hover:text-gray-700"
@@ -274,7 +274,7 @@ export default function MemoBoard({
                   >
                     ▶
                   </button>
-                </>
+                </div>
               )}
             </div>
           ))}
@@ -303,9 +303,7 @@ export default function MemoBoard({
           <div className="flex items-center justify-between px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_0_4px_rgba(250,250,249,1)]" />
-              <span className="text-xs font-medium text-amber-900">
-                새 메모
-              </span>
+              <span className="text-xs font-medium text-amber-900">새 메모</span>
             </div>
             <button
               onClick={clearDraft}
@@ -443,7 +441,8 @@ export default function MemoBoard({
                   <div className="flex items-center justify-between gap-2 text-[11px]">
                     <div className="flex items-center gap-2 text-amber-800/80">
                       <span className="px-2 py-0.5 rounded-full bg-amber-100/90 border border-amber-200/80">
-                        그룹: <span className="font-medium">{activeGroup}</span>
+                        그룹:{" "}
+                        <span className="font-medium">{activeGroup}</span>
                       </span>
                       {m.createdAt && (
                         <span className="text-[10px] text-amber-500">
