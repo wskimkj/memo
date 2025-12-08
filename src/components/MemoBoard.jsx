@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion } from "framer-motion";
 
 export default function MemoBoard({
@@ -7,10 +7,13 @@ export default function MemoBoard({
   activeGroup,
   setActiveGroup,
   groupsOrder,
-  setGroupsOrder
+  setGroupsOrder,
 }) {
   const [newGroup, setNewGroup] = useState("");
-  const [newMemo, setNewMemo] = useState("");
+  const [draftHtml, setDraftHtml] = useState("");
+  const [clipboardMemo, setClipboardMemo] = useState(null);
+
+  const draftEditorRef = useRef(null);
 
   // 실제 그룹 목록 = 저장된 순서 + memos 키들의 합집합
   const allMemoGroups = Object.keys(memos);
@@ -46,44 +49,23 @@ export default function MemoBoard({
     });
   }
 
-  // 메모 추가
-  function addMemo() {
-    const m = newMemo.trim();
-    if (!m) return;
-    const group = activeGroup || groups[0] || "기본";
-    setMemos((prev) => {
-      const copy = { ...prev };
-      if (!copy[group]) copy[group] = [];
-      copy[group] = [{ id: Date.now().toString(), text: m }, ...copy[group]];
-      return copy;
-    });
-    setNewMemo("");
-  }
-
   // 메모 삭제
   function removeMemo(id) {
+    if (!activeGroup) return;
     setMemos((prev) => {
       const copy = { ...prev };
-      copy[activeGroup] = (copy[activeGroup] || []).filter(
-        (x) => x.id !== id
-      );
+      copy[activeGroup] = (copy[activeGroup] || []).filter((m) => m.id !== id);
       return copy;
     });
   }
 
-  // 메모 내용 수정
-  function editMemo(id) {
-    const list = memos[activeGroup] || [];
-    const target = list.find((m) => m.id === id);
-    if (!target) return;
-    const next = window.prompt("메모 수정", target.text);
-    if (next == null) return;
-    const text = next.trim();
-    if (!text) return;
+  // 메모 텍스트 업데이트 (리치 텍스트 HTML 저장)
+  function updateMemoHtml(id, html) {
+    const plain = stripHtml(html);
     setMemos((prev) => {
       const copy = { ...prev };
       copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
-        m.id === id ? { ...m, text } : m
+        m.id === id ? { ...m, html, text: plain } : m
       );
       return copy;
     });
@@ -105,10 +87,152 @@ export default function MemoBoard({
     });
   }
 
+  // 메모 복사 / 잘라내기
+  function copyMemo(memo) {
+    setClipboardMemo({
+      mode: "copy",
+      fromGroup: activeGroup,
+      memo: { ...memo, id: undefined },
+    });
+  }
+
+  function cutMemo(memo) {
+    setClipboardMemo({
+      mode: "cut",
+      fromGroup: activeGroup,
+      memo: { ...memo, id: undefined },
+    });
+    // 원본 삭제
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).filter(
+        (m) => m.id !== memo.id
+      );
+      return copy;
+    });
+  }
+
+  function pasteClipboardToActiveGroup() {
+    if (!clipboardMemo) return;
+    const targetGroup = activeGroup || groups[0] || "기본";
+    const base = clipboardMemo.memo;
+    if (!base) return;
+    const newId = Date.now().toString();
+    const plain = stripHtml(base.html || base.text || "");
+    const nextMemo = {
+      id: newId,
+      text: plain,
+      html: base.html,
+      createdAt: new Date().toISOString(),
+    };
+    setMemos((prev) => {
+      const copy = { ...prev };
+      if (!copy[targetGroup]) copy[targetGroup] = [];
+      copy[targetGroup] = [nextMemo, ...(copy[targetGroup] || [])];
+      return copy;
+    });
+    if (clipboardMemo.mode === "cut") {
+      setClipboardMemo(null);
+    }
+  }
+
+  // 새 메모 추가 (상단 스티커 메모 카드)
+  function addMemo() {
+    const html = (draftHtml || "").trim();
+    const plain = stripHtml(html);
+    if (!plain) return;
+    const group = activeGroup || groups[0] || "기본";
+    const nextMemo = {
+      id: Date.now().toString(),
+      text: plain,
+      html,
+      createdAt: new Date().toISOString(),
+    };
+    setMemos((prev) => {
+      const copy = { ...prev };
+      if (!copy[group]) copy[group] = [];
+      copy[group] = [nextMemo, ...(copy[group] || [])];
+      return copy;
+    });
+    setDraftHtml("");
+    if (draftEditorRef.current) {
+      draftEditorRef.current.innerHTML = "";
+    }
+  }
+
+  function clearDraft() {
+    setDraftHtml("");
+    if (draftEditorRef.current) {
+      draftEditorRef.current.innerHTML = "";
+    }
+  }
+
+  // 리치 텍스트 툴바 액션
+  function applyFormat(command, value) {
+    document.execCommand(command, false, value ?? null);
+  }
+
+  function handleInsertLink() {
+    const url = window.prompt("링크 URL을 입력하세요");
+    if (url) {
+      applyFormat("createLink", url);
+    }
+  }
+
+  function handleInsertImage() {
+    const url = window.prompt("이미지 URL을 입력하세요");
+    if (url) {
+      applyFormat("insertImage", url);
+    }
+  }
+
   const currentMemos = memos[activeGroup] || [];
 
   return (
     <aside className="glass p-5 flex flex-col h-full">
+      {/* 상단 타이틀 */}
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-800">
+            메모 보드
+          </h2>
+          <p className="text-[11px] text-gray-400">
+            스티커 메모 느낌으로 가볍게 적고, 그룹으로 정리해보세요.
+          </p>
+        </div>
+        <div className="text-right text-[11px] text-gray-400">
+          <div>
+            현재 그룹:{" "}
+            <span className="font-medium text-gray-700">{activeGroup}</span>
+          </div>
+          <div>메모 {currentMemos.length}개</div>
+        </div>
+      </div>
+
+      {/* 클립보드 상태 (복사/잘라내기) */}
+      {clipboardMemo && (
+        <div className="mb-3 flex items-center justify-between rounded-xl border border-dashed border-amber-300/80 bg-amber-50/70 px-3 py-2 text-[11px] text-amber-800">
+          <span>
+            "{clipboardMemo.memo?.text?.slice(0, 20) || "메모"}" 를{" "}
+            {clipboardMemo.mode === "cut" ? "잘라냈어요" : "복사했어요"}.
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={pasteClipboardToActiveGroup}
+              className="px-2 py-1 rounded-full border border-amber-300 bg-white/70 hover:bg-white text-[11px] font-medium"
+            >
+              현재 그룹에 붙여넣기
+            </button>
+            <button
+              onClick={() => setClipboardMemo(null)}
+              className="px-2 py-1 rounded-full text-[11px] text-amber-500 hover:bg-amber-100/60"
+            >
+              지우기
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 상단: 그룹(폴더) 바 */}
       <div className="mb-4">
         <div className="flex items-center justify-between gap-2 mb-2">
@@ -116,16 +240,13 @@ export default function MemoBoard({
             메모 그룹 (폴더)
           </span>
           <span className="text-[11px] text-gray-400">
-            폴더를 클릭해 전환하고, 화살표로 순서를 바꿀 수 있어요.
+            폴더를 눌러 전환하고, 화살표로 순서를 바꿀 수 있어요.
           </span>
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {groups.map((g) => (
-            <div
-              key={g}
-              className="flex items-center gap-1 shrink-0"
-            >
+            <div key={g} className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => setActiveGroup(g)}
                 className={
@@ -139,123 +260,3 @@ export default function MemoBoard({
               </button>
               {activeGroup === g && (
                 <>
-                  <button
-                    onClick={() => moveGroup(g, -1)}
-                    className="text-[11px] text-gray-400 hover:text-gray-700"
-                    title="왼쪽으로 이동"
-                  >
-                    ◀
-                  </button>
-                  <button
-                    onClick={() => moveGroup(g, 1)}
-                    className="text-[11px] text-gray-400 hover:text-gray-700"
-                    title="오른쪽으로 이동"
-                  >
-                    ▶
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
-
-          {/* 새 그룹 생성 */}
-          <div className="flex items-center gap-1 shrink-0 ml-2">
-            <input
-              value={newGroup}
-              onChange={(e) => setNewGroup(e.target.value)}
-              placeholder="새 그룹"
-              className="input px-2 py-1 text-xs w-28"
-            />
-            <button
-              onClick={createGroup}
-              className="px-2 py-1 rounded-md text-xs bg-white/80 border border-gray-200 hover:bg-gray-50"
-            >
-              추가
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 메모 리스트 */}
-      <div className="flex-1 flex flex-col">
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          {currentMemos.map((m) => (
-            <motion.div
-              key={m.id}
-              whileHover={{ scale: 1.02 }}
-              className="sticky bg-gradient-to-b from-[#fff9e6] to-[#fff6d6] rounded-xl p-3 shadow-md"
-            >
-              <div className="flex justify-between items-start gap-2 mb-2">
-                <div
-                  className="text-sm cursor-pointer whitespace-pre-wrap"
-                  onDoubleClick={() => editMemo(m.id)}
-                  title="더블클릭해서 내용 수정"
-                >
-                  {m.text}
-                </div>
-                <button
-                  onClick={() => removeMemo(m.id)}
-                  className="text-xs text-red-500"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 text-[11px]">
-                <div className="text-gray-400">
-                  그룹:{" "}
-                  <span className="font-medium text-gray-700">
-                    {activeGroup}
-                  </span>
-                </div>
-
-                <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    moveMemoToGroup(m.id, e.target.value);
-                    e.target.value = "";
-                  }}
-                  className="border border-gray-200 rounded-full px-2 py-1 bg-white/80 text-[11px]"
-                >
-                  <option value="">그룹 이동</option>
-                  {groups
-                    .filter((g) => g !== activeGroup)
-                    .map((g) => (
-                      <option key={g} value={g}>
-                        {g}로 이동
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        <div className="mt-auto flex gap-2">
-          <input
-            value={newMemo}
-            onChange={(e) => setNewMemo(e.target.value)}
-            placeholder={
-              activeGroup
-                ? `"${activeGroup}" 그룹에 메모 추가...`
-                : "메모 추가..."
-            }
-            className="input flex-1 text-sm"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addMemo();
-            }}
-          />
-          <button
-            onClick={addMemo}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-white shadow-md hover:shadow-lg transition-shadow"
-            style={{
-              background: "linear-gradient(90deg,#7b5cfa,#a084ff)"
-            }}
-          >
-            추가
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
-}
