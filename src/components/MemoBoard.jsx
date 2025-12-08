@@ -13,6 +13,9 @@ export default function MemoBoard({
   const [draftHtml, setDraftHtml] = useState("");
   const [clipboardMemo, setClipboardMemo] = useState(null);
 
+  const [draggingGroup, setDraggingGroup] = useState(null);
+  const [dragOverGroup, setDragOverGroup] = useState(null);
+
   const draftEditorRef = useRef(null);
 
   // 실제 그룹 목록 = 저장된 순서 + memos 키들의 합집합
@@ -35,7 +38,7 @@ export default function MemoBoard({
     setNewGroup("");
   }
 
-  // 그룹 순서 이동
+  // 그룹 순서 이동 (버튼 클릭용)
   function moveGroup(name, dir) {
     setGroupsOrder((prev) => {
       const base = prev && prev.length ? [...prev] : [...groups];
@@ -47,6 +50,91 @@ export default function MemoBoard({
       copy.splice(newIdx, 0, item);
       return copy;
     });
+  }
+
+  // 그룹 삭제
+  function deleteGroup(name) {
+    if (!name) return;
+    const otherGroups = groups.filter((g) => g !== name);
+    if (otherGroups.length === 0) {
+      window.alert("마지막 남은 그룹은 삭제할 수 없어요.");
+      return;
+    }
+
+    const memoCount = (memos[name] || []).length;
+    const targetGroup = otherGroups[0];
+
+    if (memoCount > 0) {
+      const ok = window.confirm(
+        `그룹 "${name}" 안에 메모 ${memoCount}개가 있습니다.\n` +
+          `삭제하면 이 메모들은 "${targetGroup}" 그룹으로 이동해둘게요.\n계속 진행할까요?`
+      );
+      if (!ok) return;
+    }
+
+    // memos에서 그룹 제거 + 메모 이동
+    setMemos((prev) => {
+      const copy = { ...prev };
+      const moving = copy[name] || [];
+      delete copy[name];
+      if (moving.length > 0) {
+        copy[targetGroup] = [...moving, ...(copy[targetGroup] || [])];
+      }
+      return copy;
+    });
+
+    // 그룹 순서에서도 제거
+    setGroupsOrder((prev) =>
+      (prev || []).filter((g) => g !== name)
+    );
+
+    // 현재 활성 그룹이 삭제된 그룹이면 활성 그룹 변경
+    if (activeGroup === name) {
+      setActiveGroup(targetGroup);
+    }
+  }
+
+  // 드래그로 그룹 순서 변경
+  function handleGroupDragStart(name) {
+    setDraggingGroup(name);
+  }
+
+  function handleGroupDragOver(e, targetName) {
+    e.preventDefault();
+    if (!draggingGroup || draggingGroup === targetName) return;
+    setDragOverGroup(targetName);
+  }
+
+  function handleGroupDrop(e, targetName) {
+    e.preventDefault();
+    if (!draggingGroup || draggingGroup === targetName) {
+      handleGroupDragEnd();
+      return;
+    }
+
+    setGroupsOrder((prev) => {
+      const base =
+        prev && prev.length
+          ? [...prev]
+          : [...Array.from(new Set([...(prev || []), ...Object.keys(memos || {})]))];
+
+      const sourceIndex = base.indexOf(draggingGroup);
+      const targetIndex = base.indexOf(targetName);
+      if (sourceIndex === -1 || targetIndex === -1) return base;
+
+      const updated = [...base];
+      const [moved] = updated.splice(sourceIndex, 1);
+      updated.splice(targetIndex, 0, moved);
+      return updated;
+    });
+
+    setDraggingGroup(null);
+    setDragOverGroup(null);
+  }
+
+  function handleGroupDragEnd() {
+    setDraggingGroup(null);
+    setDragOverGroup(null);
   }
 
   // 메모 삭제
@@ -238,28 +326,43 @@ export default function MemoBoard({
             메모 그룹 (폴더)
           </span>
           <span className="text-[11px] text-gray-400">
-            폴더를 눌러 전환하고, 화살표로 순서를 바꿀 수 있어요.
+            그룹을 드래그해서 순서를 바꾸고, 폴더를 눌러 전환할 수 있어요.
           </span>
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {groups.map((g) => (
-            <div key={g} className="flex items-center gap-1 shrink-0">
+            <div
+              key={g}
+              className={
+                "flex items-center gap-1 shrink-0 rounded-full px-0.5 py-0.5 transition-colors " +
+                (dragOverGroup === g &&
+                draggingGroup &&
+                draggingGroup !== g
+                  ? "bg-violet-50/90"
+                  : "bg-transparent")
+              }
+              draggable
+              onDragStart={() => handleGroupDragStart(g)}
+              onDragOver={(e) => handleGroupDragOver(e, g)}
+              onDrop={(e) => handleGroupDrop(e, g)}
+              onDragEnd={handleGroupDragEnd}
+            >
               <button
                 onClick={() => setActiveGroup(g)}
                 className={
-                  "px-3 py-1.5 rounded-full text-xs border transition-colors " +
+                  "px-3 py-1.5 rounded-full text-xs border transition-colors cursor-pointer select-none " +
                   (activeGroup === g
                     ? "bg-gradient-to-r from-[#7b5cfa] to-[#a084ff] text-white border-transparent shadow-sm"
                     : "bg-white/80 border-gray-200 text-gray-700 hover:bg-white")
                 }
+                title="드래그해서 순서 변경 가능"
               >
                 {g}
               </button>
 
-              {/* Fragment 대신 div 사용해서 에러 방지 */}
               {activeGroup === g && (
-                <div className="flex items-center gap-0.5">
+                <div className="flex items-center gap-0.5 ml-0.5">
                   <button
                     onClick={() => moveGroup(g, -1)}
                     className="text-[11px] text-gray-400 hover:text-gray-700"
@@ -273,6 +376,13 @@ export default function MemoBoard({
                     title="오른쪽으로 이동"
                   >
                     ▶
+                  </button>
+                  <button
+                    onClick={() => deleteGroup(g)}
+                    className="text-[11px] text-gray-300 hover:text-red-500"
+                    title="그룹 삭제"
+                  >
+                    🗑
                   </button>
                 </div>
               )}
@@ -303,7 +413,9 @@ export default function MemoBoard({
           <div className="flex items-center justify-between px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_0_4px_rgba(250,250,249,1)]" />
-              <span className="text-xs font-medium text-amber-900">새 메모</span>
+              <span className="text-xs font-medium text-amber-900">
+                새 메모
+              </span>
             </div>
             <button
               onClick={clearDraft}
