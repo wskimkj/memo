@@ -5,43 +5,112 @@ export default function TodoBoard({ todos, setTodos }) {
   const [quickTitle, setQuickTitle] = useState("");
   const [quickDue, setQuickDue] = useState("");
   const [quickPriority, setQuickPriority] = useState("normal");
+  const [quickTags, setQuickTags] = useState("");
+  const [quickNote, setQuickNote] = useState("");
+
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverStatus, setDragOverStatus] = useState(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterPriority, setFilterPriority] = useState("all");
+  const [todayOnly, setTodayOnly] = useState(false);
+
   const list = Array.isArray(todos) ? todos : [];
 
-  // 기존 데이터 호환:
-  // - title 없으면 text 사용
-  // - status 없으면 done ? "done" : "todo"
-  const normalized = list.map((t) => ({
-    ...t,
-    title: t.title || t.text || "",
-    status:
-      t.status || (t.done ? "done" : "todo"), // 옛날 done 필드 지원
-  }));
+  // 기존 데이터 호환: title / status / tags / note 정리
+  const normalized = list.map((t) => {
+    const status = t.status || (t.done ? "done" : "todo");
+    const tags =
+      Array.isArray(t.tags)
+        ? t.tags
+        : typeof t.tags === "string"
+        ? t.tags
+            .split(",")
+            .map((x) => x.trim())
+            .filter(Boolean)
+        : [];
+    return {
+      ...t,
+      title: t.title || t.text || "",
+      status,
+      tags,
+      note: t.note || "",
+    };
+  });
+
+  // 오늘 날짜 비교용 (dueDate == 오늘)
+  function isToday(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return false;
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  }
+
+  // 검색/필터 적용
+  const filtered = normalized.filter((t) => {
+    // 우선순위 필터
+    if (
+      filterPriority !== "all" &&
+      (t.priority || "normal") !== filterPriority
+    ) {
+      return false;
+    }
+
+    // 오늘만 보기 필터
+    if (todayOnly && !isToday(t.dueDate)) {
+      return false;
+    }
+
+    // 검색어 필터
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+
+    const haystack = [
+      t.title || "",
+      t.text || "",
+      t.note || "",
+      ...(t.tags || []),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(q);
+  });
 
   const columns = {
     todo: {
       label: "할 일",
       description: "해야 할 일들",
-      items: normalized.filter((t) => t.status === "todo"),
+      items: filtered.filter((t) => t.status === "todo"),
     },
     doing: {
       label: "진행 중",
       description: "지금 손대고 있는 것들",
-      items: normalized.filter((t) => t.status === "doing"),
+      items: filtered.filter((t) => t.status === "doing"),
     },
     done: {
       label: "완료",
       description: "끝낸 일들",
-      items: normalized.filter((t) => t.status === "done"),
+      items: filtered.filter((t) => t.status === "done"),
     },
   };
 
   function addQuickTodo() {
     const title = quickTitle.trim();
     if (!title) return;
+
     const now = new Date().toISOString();
+    const tags =
+      quickTags
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean) || [];
+
     const newTodo = {
       id: Date.now().toString(),
       title,
@@ -51,14 +120,20 @@ export default function TodoBoard({ todos, setTodos }) {
       dueDate: quickDue || null,
       createdAt: now,
       done: false,
+      note: quickNote.trim() || "",
+      tags,
     };
+
     setTodos((prev) => {
       const base = Array.isArray(prev) ? prev : [];
       return [newTodo, ...base];
     });
+
     setQuickTitle("");
     setQuickDue("");
     setQuickPriority("normal");
+    setQuickTags("");
+    setQuickNote("");
   }
 
   function toggleDone(id) {
@@ -68,7 +143,8 @@ export default function TodoBoard({ todos, setTodos }) {
         if (t.id !== id) return t;
         const currentStatus =
           t.status || (t.done ? "done" : "todo");
-        const nextStatus = currentStatus === "done" ? "todo" : "done";
+        const nextStatus =
+          currentStatus === "done" ? "todo" : "done";
         return {
           ...t,
           status: nextStatus,
@@ -93,6 +169,50 @@ export default function TodoBoard({ todos, setTodos }) {
             newStatus === "done" ? new Date().toISOString() : null,
         };
       });
+    });
+  }
+
+  function updateNote(id) {
+    const current = normalized.find((t) => t.id === id);
+    const prevNote = current?.note || "";
+    const next = window.prompt(
+      "이 Todo의 상세 메모를 입력하세요:",
+      prevNote
+    );
+    if (next === null) return;
+
+    setTodos((prev) => {
+      const base = Array.isArray(prev) ? prev : [];
+      return base.map((t) =>
+        t.id === id ? { ...t, note: next } : t
+      );
+    });
+  }
+
+  function updateTags(id) {
+    const current = normalized.find((t) => t.id === id);
+    const prevTags =
+      current?.tags?.join(", ") ||
+      (typeof current?.tags === "string"
+        ? current.tags
+        : "");
+    const next = window.prompt(
+      "태그를 쉼표로 구분해서 입력하세요:",
+      prevTags
+    );
+    if (next === null) return;
+
+    const tags =
+      next
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean) || [];
+
+    setTodos((prev) => {
+      const base = Array.isArray(prev) ? prev : [];
+      return base.map((t) =>
+        t.id === id ? { ...t, tags } : t
+      );
     });
   }
 
@@ -159,24 +279,67 @@ export default function TodoBoard({ todos, setTodos }) {
 
   return (
     <section className="glass p-5 flex flex-col h-full">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-sm font-semibold text-gray-800">
-            Todo 보드
-          </h2>
-          <p className="text-[11px] text-gray-400">
-            오늘 할 일, 진행 중, 완료를 한 눈에 보는 칸반 보드.
-          </p>
-        </div>
-        <div className="text-right text-[11px] text-gray-400">
-          <div>전체 {normalized.length}개</div>
+      {/* 헤더 + 검색/필터 */}
+      <div className="flex flex-col gap-2 mb-4">
+        <div className="flex items-center justify-between">
           <div>
-            완료{" "}
-            {
-              normalized.filter((t) => t.status === "done").length
-            }
-            개
+            <h2 className="text-sm font-semibold text-gray-800">
+              Todo 보드
+            </h2>
+            <p className="text-[11px] text-gray-400">
+              오늘 할 일, 진행 중, 완료를 한 눈에 보는 칸반 보드.
+            </p>
+          </div>
+          <div className="text-right text-[11px] text-gray-400">
+            <div>전체 {normalized.length}개</div>
+            <div>
+              완료{" "}
+              {
+                normalized.filter((t) => t.status === "done")
+                  .length
+              }
+              개
+            </div>
+          </div>
+        </div>
+
+        {/* 검색 + 필터 바 */}
+        <div className="flex flex-col md:flex-row md:items-center gap-2">
+          <div className="flex-1 flex items-center gap-2">
+            <input
+              className="flex-1 input text-xs px-3 py-2"
+              placeholder="검색: 제목, 내용, 노트, 태그…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-[11px]">
+            <select
+              className="input text-[11px] px-2 py-1"
+              value={filterPriority}
+              onChange={(e) =>
+                setFilterPriority(e.target.value)
+              }
+            >
+              <option value="all">우선순위 전체</option>
+              <option value="high">🔥 높음만</option>
+              <option value="normal">보통만</option>
+              <option value="low">여유만</option>
+            </select>
+
+            <label className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-50 border border-slate-200 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-3 h-3 accent-amber-500"
+                checked={todayOnly}
+                onChange={(e) =>
+                  setTodayOnly(e.target.checked)
+                }
+              />
+              <span className="text-[11px] text-slate-600">
+                오늘 마감만
+              </span>
+            </label>
           </div>
         </div>
       </div>
@@ -189,51 +352,77 @@ export default function TodoBoard({ todos, setTodos }) {
             빠른 할 일 추가
           </span>
         </div>
-        <div className="flex flex-col md:flex-row md:items-center gap-2">
-          <input
-            className="flex-1 input text-xs px-3 py-2"
-            placeholder="예: 스마트스토어 엑셀 포맷 수정하기"
-            value={quickTitle}
-            onChange={(e) => setQuickTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addQuickTodo();
-            }}
-          />
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 text-[11px] text-gray-500">
-              <span>마감일</span>
-              <input
-                type="date"
-                className="input text-[11px] px-2 py-1"
-                value={quickDue}
-                onChange={(e) => setQuickDue(e.target.value)}
-              />
-            </div>
-            <select
-              className="input text-[11px] px-2 py-1"
-              value={quickPriority}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col md:flex-row md:items-center gap-2">
+            <input
+              className="flex-1 input text-xs px-3 py-2"
+              placeholder="예: 스마트스토어 엑셀 포맷 수정하기"
+              value={quickTitle}
               onChange={(e) =>
-                setQuickPriority(e.target.value)
+                setQuickTitle(e.target.value)
               }
-            >
-              <option value="high">🔥 높음</option>
-              <option value="normal">보통</option>
-              <option value="low">여유</option>
-            </select>
-            <button
-              onClick={addQuickTodo}
-              className="px-3 py-1.5 rounded-full text-xs font-medium text-white shadow-md hover:shadow-lg transition-shadow"
-              style={{
-                background:
-                  "linear-gradient(90deg,#0ea5e9,#38bdf8)",
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addQuickTodo();
               }}
-            >
-              추가
-            </button>
+            />
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                <span>마감일</span>
+                <input
+                  type="date"
+                  className="input text-[11px] px-2 py-1"
+                  value={quickDue}
+                  onChange={(e) =>
+                    setQuickDue(e.target.value)
+                  }
+                />
+              </div>
+              <select
+                className="input text-[11px] px-2 py-1"
+                value={quickPriority}
+                onChange={(e) =>
+                  setQuickPriority(e.target.value)
+                }
+              >
+                <option value="high">🔥 높음</option>
+                <option value="normal">보통</option>
+                <option value="low">여유</option>
+              </select>
+              <button
+                onClick={addQuickTodo}
+                className="px-3 py-1.5 rounded-full text-xs font-medium text-white shadow-md hover:shadow-lg transition-shadow"
+                style={{
+                  background:
+                    "linear-gradient(90deg,#0ea5e9,#38bdf8)",
+                }}
+              >
+                추가
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-2">
+            <input
+              className="flex-1 input text-[11px] px-3 py-1.5"
+              placeholder="태그 (쉼표로 구분, 예: 스마트스토어,엑셀,자동화)"
+              value={quickTags}
+              onChange={(e) =>
+                setQuickTags(e.target.value)
+              }
+            />
+            <input
+              className="flex-[2] input text-[11px] px-3 py-1.5"
+              placeholder="간단한 메모 (이 Todo에 대한 설명)"
+              value={quickNote}
+              onChange={(e) =>
+                setQuickNote(e.target.value)
+              }
+            />
           </div>
         </div>
         <p className="mt-1 text-[10px] text-sky-500">
-          카드들은 아래 칼럼에서 드래그해서 상태를 바꿀 수 있어요.
+          카드들은 아래 칼럼에서 드래그해서 상태를 바꿀 수 있고,
+          노트·태그는 카드에서 바로 수정할 수 있어요.
         </p>
       </div>
 
@@ -302,6 +491,7 @@ export default function TodoBoard({ todos, setTodos }) {
                         handleCardDragStart(t.id)
                       }
                     >
+                      {/* 제목 + 체크박스 */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <div className="flex items-center gap-1 mb-0.5">
@@ -327,14 +517,15 @@ export default function TodoBoard({ todos, setTodos }) {
                             </p>
                           </div>
                           {t.note && (
-                            <p className="text-[11px] text-slate-400 mt-0.5">
+                            <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-2">
                               {t.note}
                             </p>
                           )}
                         </div>
                       </div>
 
-                      <div className="mt-1 flex items-center justify-between gap-2">
+                      {/* 태그/메타 */}
+                      <div className="mt-2 flex flex-col gap-1">
                         <div className="flex flex-wrap items-center gap-1">
                           {getPriorityBadge(
                             t.priority || "normal"
@@ -343,42 +534,72 @@ export default function TodoBoard({ todos, setTodos }) {
                             <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-50 text-amber-600 border border-amber-100">
                               마감:{" "}
                               {formatDateLabel(t.dueDate)}
+                              {isToday(t.dueDate) && " · 오늘"}
                             </span>
                           )}
+                          {(t.tags || []).map((tag) => (
+                            <span
+                              key={tag}
+                              className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-50 text-slate-500 border border-slate-100"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
                         </div>
 
-                        {/* 상태 변경 작은 버튼 */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {statusKey !== "todo" && (
+                        {/* 노트/태그 수정 + 상태 버튼 */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               className="px-2 py-0.5 rounded-full text-[10px] border border-slate-200 text-slate-500 hover:bg-slate-50"
                               onClick={() =>
-                                updateStatus(t.id, "todo")
+                                updateNote(t.id)
                               }
                             >
-                              ↩ 할 일
+                              📝 메모
                             </button>
-                          )}
-                          {statusKey !== "doing" && (
                             <button
                               className="px-2 py-0.5 rounded-full text-[10px] border border-slate-200 text-slate-500 hover:bg-slate-50"
                               onClick={() =>
-                                updateStatus(t.id, "doing")
+                                updateTags(t.id)
                               }
                             >
-                              ⚙ 진행
+                              # 태그
                             </button>
-                          )}
-                          {statusKey !== "done" && (
-                            <button
-                              className="px-2 py-0.5 rounded-full text-[10px] border border-emerald-200 text-emerald-500 hover:bg-emerald-50"
-                              onClick={() =>
-                                updateStatus(t.id, "done")
-                              }
-                            >
-                              ✅ 완료
-                            </button>
-                          )}
+                          </div>
+
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {statusKey !== "todo" && (
+                              <button
+                                className="px-2 py-0.5 rounded-full text-[10px] border border-slate-200 text-slate-500 hover:bg-slate-50"
+                                onClick={() =>
+                                  updateStatus(t.id, "todo")
+                                }
+                              >
+                                ↩ 할 일
+                              </button>
+                            )}
+                            {statusKey !== "doing" && (
+                              <button
+                                className="px-2 py-0.5 rounded-full text-[10px] border border-slate-200 text-slate-500 hover:bg-slate-50"
+                                onClick={() =>
+                                  updateStatus(t.id, "doing")
+                                }
+                              >
+                                ⚙ 진행
+                              </button>
+                            )}
+                            {statusKey !== "done" && (
+                              <button
+                                className="px-2 py-0.5 rounded-full text-[10px] border border-emerald-200 text-emerald-500 hover:bg-emerald-50"
+                                onClick={() =>
+                                  updateStatus(t.id, "done")
+                                }
+                              >
+                                ✅ 완료
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </motion.div>
