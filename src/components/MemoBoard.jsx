@@ -260,3 +260,248 @@ export default function MemoBoard({
               </button>
               {activeGroup === g && (
                 <>
+                  <button
+                    onClick={() => moveGroup(g, -1)}
+                    className="text-[11px] text-gray-400 hover:text-gray-700"
+                    title="왼쪽으로 이동"
+                  >
+                    ◀
+                  </button>
+                  <button
+                    onClick={() => moveGroup(g, 1)}
+                    className="text-[11px] text-gray-400 hover:text-gray-700"
+                    title="오른쪽으로 이동"
+                  >
+                    ▶
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+
+          {/* 새 그룹 생성 */}
+          <div className="flex items-center gap-1 shrink-0 ml-2">
+            <input
+              value={newGroup}
+              onChange={(e) => setNewGroup(e.target.value)}
+              placeholder="새 그룹"
+              className="input px-2 py-1 text-xs w-28"
+            />
+            <button
+              onClick={createGroup}
+              className="px-2 py-1 rounded-md text-xs bg-white/80 border border-gray-200 hover:bg-gray-50"
+            >
+              추가
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 상단: 스티커 메모 입력 카드 */}
+      <div className="mb-4">
+        <div className="rounded-2xl bg-gradient-to-br from-[#fef3c7]/80 via-white/95 to-white/95 border border-amber-100/80 shadow-[0_18px_40px_rgba(251,191,36,0.18)]">
+          <div className="flex items-center justify-between px-4 pt-3 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_0_4px_rgba(250,250,249,1)]" />
+              <span className="text-xs font-medium text-amber-900">
+                새 메모
+              </span>
+            </div>
+            <button
+              onClick={clearDraft}
+              className="text-[11px] text-amber-500 hover:text-amber-700"
+            >
+              비우기
+            </button>
+          </div>
+
+          {/* 서식 툴바 */}
+          <div className="flex items-center gap-1 px-4 pb-2 border-t border-b border-amber-100/80 text-[11px] text-amber-800/80">
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyFormat("bold")}
+              className="px-2 py-1 rounded-md hover:bg-amber-100/80 font-semibold"
+            >
+              B
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyFormat("italic")}
+              className="px-2 py-1 rounded-md hover:bg-amber-100/80 italic"
+            >
+              I
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyFormat("underline")}
+              className="px-2 py-1 rounded-md hover:bg-amber-100/80 underline"
+            >
+              U
+            </button>
+            <span className="mx-1 h-4 w-px bg-amber-200/80" />
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyFormat("insertUnorderedList")}
+              className="px-2 py-1 rounded-md hover:bg-amber-100/80"
+            >
+              • 목록
+            </button>
+            <span className="mx-1 h-4 w-px bg-amber-200/80" />
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleInsertLink}
+              className="px-2 py-1 rounded-md hover:bg-amber-100/80"
+            >
+              링크
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleInsertImage}
+              className="px-2 py-1 rounded-md hover:bg-amber-100/80"
+            >
+              이미지
+            </button>
+            <span className="ml-auto text-[10px] text-amber-500">
+              현재 그룹: {activeGroup}
+            </span>
+          </div>
+
+          {/* 에디터 본문 */}
+          <div
+            ref={draftEditorRef}
+            className="min-h-[110px] max-h-64 overflow-y-auto px-4 pb-3 pt-2 text-sm leading-relaxed text-gray-800 outline-none"
+            contentEditable
+            data-placeholder="여기에 새 메모를 자유롭게 적어보세요. URL을 붙여넣거나, 이미지 URL을 추가할 수 있어요."
+            onInput={(e) => setDraftHtml(e.currentTarget.innerHTML)}
+          />
+
+          <div className="flex items-center justify-between px-4 pb-3">
+            <span className="text-[11px] text-amber-500">
+              엔터로 줄바꿈, 위 툴바로 서식·링크·이미지를 넣을 수 있어요.
+            </span>
+            <button
+              onClick={addMemo}
+              className="px-3 py-1.5 rounded-full text-xs font-medium text-white shadow-md hover:shadow-lg transition-shadow"
+              style={{
+                background: "linear-gradient(90deg,#f97316,#fbbf24)",
+              }}
+            >
+              메모 추가
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 메모 리스트 */}
+      <div className="flex-1 flex flex-col">
+        {currentMemos.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-xs text-gray-400">
+            아직 이 그룹에는 메모가 없어요. 위에서 새 메모를 만들어보세요 ✨
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            {currentMemos.map((m) => {
+              const contentHtml =
+                m.html || (m.text ? m.text.replace(/\n/g, "<br />") : "");
+              return (
+                <motion.div
+                  key={m.id}
+                  whileHover={{ scale: 1.02, translateY: -2 }}
+                  className="relative bg-gradient-to-b from-[#fef9c3] via-[#fffbeb] to-[#fef3c7] rounded-2xl p-3 shadow-[0_16px_30px_rgba(251,191,36,0.35)] border border-amber-100"
+                >
+                  {/* 상단 핀 느낌 점 */}
+                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-amber-300 shadow-[0_0_0_4px_rgba(254,252,232,1)]" />
+
+                  <div className="flex justify-between items-start gap-2 mb-2">
+                    <div className="flex-1">
+                      <div
+                        className="text-sm whitespace-pre-wrap leading-relaxed focus:outline-none"
+                        contentEditable
+                        suppressContentEditableWarning
+                        onBlur={(e) =>
+                          updateMemoHtml(m.id, e.currentTarget.innerHTML)
+                        }
+                        dangerouslySetInnerHTML={{ __html: contentHtml }}
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => removeMemo(m.id)}
+                      className="ml-1 text-xs text-amber-500 hover:text-red-500"
+                      title="메모 삭제"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 text-[11px]">
+                    <div className="flex items-center gap-2 text-amber-800/80">
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100/90 border border-amber-200/80">
+                        그룹: <span className="font-medium">{activeGroup}</span>
+                      </span>
+                      {m.createdAt && (
+                        <span className="text-[10px] text-amber-500">
+                          {new Date(m.createdAt).toLocaleString("ko-KR", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => copyMemo(m)}
+                        className="px-2 py-1 rounded-full text-[11px] bg-white/70 border border-amber-200 hover:bg-white"
+                      >
+                        복사
+                      </button>
+                      <button
+                        onClick={() => cutMemo(m)}
+                        className="px-2 py-1 rounded-full text-[11px] bg-white/70 border border-amber-200 hover:bg-white text-amber-600"
+                      >
+                        잘라내기
+                      </button>
+
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          moveMemoToGroup(m.id, e.target.value);
+                          e.target.value = "";
+                        }}
+                        className="border border-amber-200 rounded-full px-2 py-1 bg-white/80 text-[11px]"
+                      >
+                        <option value="">그룹 이동</option>
+                        {groups
+                          .filter((g) => g !== activeGroup)
+                          .map((g) => (
+                            <option key={g} value={g}>
+                              {g}로 이동
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+// 간단한 HTML -> 텍스트 변환
+function stripHtml(html) {
+  if (!html) return "";
+  return html.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+}
