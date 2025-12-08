@@ -1,109 +1,394 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { motion } from "framer-motion";
 
 export default function TodoBoard({ todos, setTodos }) {
-  const [text, setText] = useState("");
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickDue, setQuickDue] = useState("");
+  const [quickPriority, setQuickPriority] = useState("normal");
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverStatus, setDragOverStatus] = useState(null);
 
-  const addTodo = (e) => {
-    e.preventDefault();
-    if (!text.trim()) return;
+  const list = Array.isArray(todos) ? todos : [];
 
+  // 기존 데이터 호환:
+  // - title 없으면 text 사용
+  // - status 없으면 done ? "done" : "todo"
+  const normalized = list.map((t) => ({
+    ...t,
+    title: t.title || t.text || "",
+    status:
+      t.status || (t.done ? "done" : "todo"), // 옛날 done 필드 지원
+  }));
+
+  const columns = {
+    todo: {
+      label: "할 일",
+      description: "해야 할 일들",
+      items: normalized.filter((t) => t.status === "todo"),
+    },
+    doing: {
+      label: "진행 중",
+      description: "지금 손대고 있는 것들",
+      items: normalized.filter((t) => t.status === "doing"),
+    },
+    done: {
+      label: "완료",
+      description: "끝낸 일들",
+      items: normalized.filter((t) => t.status === "done"),
+    },
+  };
+
+  function addQuickTodo() {
+    const title = quickTitle.trim();
+    if (!title) return;
+    const now = new Date().toISOString();
     const newTodo = {
-      id: crypto.randomUUID(),
-      text,
+      id: Date.now().toString(),
+      title,
+      text: title,
+      status: "todo",
+      priority: quickPriority,
+      dueDate: quickDue || null,
+      createdAt: now,
       done: false,
-      date: null,
     };
+    setTodos((prev) => {
+      const base = Array.isArray(prev) ? prev : [];
+      return [newTodo, ...base];
+    });
+    setQuickTitle("");
+    setQuickDue("");
+    setQuickPriority("normal");
+  }
 
-    setTodos([newTodo, ...todos]);
-    setText("");
-  };
+  function toggleDone(id) {
+    setTodos((prev) => {
+      const base = Array.isArray(prev) ? prev : [];
+      return base.map((t) => {
+        if (t.id !== id) return t;
+        const currentStatus =
+          t.status || (t.done ? "done" : "todo");
+        const nextStatus = currentStatus === "done" ? "todo" : "done";
+        return {
+          ...t,
+          status: nextStatus,
+          done: nextStatus === "done",
+          completedAt:
+            nextStatus === "done" ? new Date().toISOString() : null,
+        };
+      });
+    });
+  }
 
-  const toggleTodo = (id) => {
-    setTodos(
-      todos.map((t) =>
-        t.id === id ? { ...t, done: !t.done } : t
-      )
-    );
-  };
+  function updateStatus(id, newStatus) {
+    setTodos((prev) => {
+      const base = Array.isArray(prev) ? prev : [];
+      return base.map((t) => {
+        if (t.id !== id) return t;
+        return {
+          ...t,
+          status: newStatus,
+          done: newStatus === "done",
+          completedAt:
+            newStatus === "done" ? new Date().toISOString() : null,
+        };
+      });
+    });
+  }
 
-  const removeTodo = (id) => {
-    setTodos(todos.filter((t) => t.id !== id));
-  };
+  function handleCardDragStart(id) {
+    setDraggingId(id);
+  }
+
+  function handleColumnDragOver(e, statusKey) {
+    e.preventDefault();
+    if (!draggingId) return;
+    setDragOverStatus(statusKey);
+  }
+
+  function handleColumnDrop(e, statusKey) {
+    e.preventDefault();
+    if (!draggingId) {
+      setDragOverStatus(null);
+      return;
+    }
+    updateStatus(draggingId, statusKey);
+    setDraggingId(null);
+    setDragOverStatus(null);
+  }
+
+  function handleColumnDragLeave(e, statusKey) {
+    e.preventDefault();
+    if (dragOverStatus === statusKey) {
+      setDragOverStatus(null);
+    }
+  }
+
+  function getPriorityBadge(priority) {
+    switch (priority) {
+      case "high":
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-red-100 text-red-600 border border-red-200">
+            🔥 높은 우선순위
+          </span>
+        );
+      case "low":
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-500 border border-slate-200">
+            여유 있음
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 border border-blue-100">
+            보통
+          </span>
+        );
+    }
+  }
+
+  function formatDateLabel(d) {
+    if (!d) return null;
+    const date = new Date(d);
+    if (Number.isNaN(date.getTime())) return d;
+    return date.toLocaleDateString("ko-KR", {
+      month: "short",
+      day: "numeric",
+    });
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-
-      {/* 입력바: floating 스타일 */}
-      <form onSubmit={addTodo} className="relative">
-        <input
-          type="text"
-          value={text}
-          placeholder="할 일을 입력하세요..."
-          onChange={(e) => setText(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-white/90 border border-gray-200 shadow-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all"
-        />
-
-        {text.length > 0 && (
-          <button
-            type="submit"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-sm px-3 py-1 
-                       bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 transition"
-          >
-            추가
-          </button>
-        )}
-      </form>
-
-      {/* 리스트 */}
-      <div className="space-y-2">
-        {todos.length === 0 && (
-          <p className="text-gray-400 text-sm text-center py-6">
-            아직 할 일이 없어요 ✨
+    <section className="glass p-5 flex flex-col h-full">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-800">
+            Todo 보드
+          </h2>
+          <p className="text-[11px] text-gray-400">
+            오늘 할 일, 진행 중, 완료를 한 눈에 보는 칸반 보드.
           </p>
-        )}
+        </div>
+        <div className="text-right text-[11px] text-gray-400">
+          <div>전체 {normalized.length}개</div>
+          <div>
+            완료{" "}
+            {
+              normalized.filter((t) => t.status === "done").length
+            }
+            개
+          </div>
+        </div>
+      </div>
 
-        {todos.map((t) => (
-          <div
-            key={t.id}
-            className="group flex items-center justify-between p-3 bg-white/80 rounded-xl border border-gray-200
-                       shadow-sm hover:shadow-md transition cursor-pointer"
-          >
-            {/* 왼쪽: 체크 + 텍스트 */}
-            <div
-              className="flex items-center gap-3 flex-1"
-              onClick={() => toggleTodo(t.id)}
-            >
-              <div
-                className={`w-5 h-5 rounded-md border flex items-center justify-center transition
-                  ${
-                    t.done
-                      ? "bg-blue-500 border-blue-500 text-white"
-                      : "border-gray-300 bg-white"
-                  }`}
-              >
-                {t.done && "✓"}
-              </div>
-
-              <span
-                className={`text-sm transition ${
-                  t.done ? "line-through text-gray-400" : "text-gray-800"
-                }`}
-              >
-                {t.text}
-              </span>
+      {/* 빠른 추가 영역 */}
+      <div className="mb-4 rounded-2xl bg-gradient-to-r from-[#e0f2fe] via-white to-[#fef9c3] border border-sky-100/80 shadow-[0_16px_32px_rgba(56,189,248,0.25)] px-4 py-3">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-2 h-2 rounded-full bg-sky-400 shadow-[0_0_0_4px_rgba(255,255,255,1)]" />
+          <span className="text-xs font-medium text-sky-900">
+            빠른 할 일 추가
+          </span>
+        </div>
+        <div className="flex flex-col md:flex-row md:items-center gap-2">
+          <input
+            className="flex-1 input text-xs px-3 py-2"
+            placeholder="예: 스마트스토어 엑셀 포맷 수정하기"
+            value={quickTitle}
+            onChange={(e) => setQuickTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addQuickTodo();
+            }}
+          />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 text-[11px] text-gray-500">
+              <span>마감일</span>
+              <input
+                type="date"
+                className="input text-[11px] px-2 py-1"
+                value={quickDue}
+                onChange={(e) => setQuickDue(e.target.value)}
+              />
             </div>
-
-            {/* 삭제 버튼 */}
-            <button
-              onClick={() => removeTodo(t.id)}
-              className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs transition"
+            <select
+              className="input text-[11px] px-2 py-1"
+              value={quickPriority}
+              onChange={(e) =>
+                setQuickPriority(e.target.value)
+              }
             >
-              삭제
+              <option value="high">🔥 높음</option>
+              <option value="normal">보통</option>
+              <option value="low">여유</option>
+            </select>
+            <button
+              onClick={addQuickTodo}
+              className="px-3 py-1.5 rounded-full text-xs font-medium text-white shadow-md hover:shadow-lg transition-shadow"
+              style={{
+                background:
+                  "linear-gradient(90deg,#0ea5e9,#38bdf8)",
+              }}
+            >
+              추가
             </button>
           </div>
-        ))}
+        </div>
+        <p className="mt-1 text-[10px] text-sky-500">
+          카드들은 아래 칼럼에서 드래그해서 상태를 바꿀 수 있어요.
+        </p>
       </div>
-    </div>
+
+      {/* 칸반 보드 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1 min-h-[260px]">
+        {Object.entries(columns).map(
+          ([statusKey, col]) => (
+            <div
+              key={statusKey}
+              className={
+                "flex flex-col rounded-2xl border border-slate-100/80 bg-white/70 backdrop-blur-sm overflow-hidden shadow-[0_10px_26px_rgba(15,23,42,0.06)] " +
+                (dragOverStatus === statusKey
+                  ? "ring-2 ring-sky-300/80"
+                  : "")
+              }
+              onDragOver={(e) =>
+                handleColumnDragOver(e, statusKey)
+              }
+              onDrop={(e) =>
+                handleColumnDrop(e, statusKey)
+              }
+              onDragLeave={(e) =>
+                handleColumnDragLeave(e, statusKey)
+              }
+            >
+              {/* 컬럼 헤더 */}
+              <div className="px-3 pt-2 pb-2 border-b border-slate-100/80 flex items-center justify-between bg-slate-50/60">
+                <div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] font-semibold text-slate-800">
+                      {col.label}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {col.items.length}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    {col.description}
+                  </p>
+                </div>
+                <div className="text-[18px]">
+                  {statusKey === "todo" && "📝"}
+                  {statusKey === "doing" && "⚙️"}
+                  {statusKey === "done" && "✅"}
+                </div>
+              </div>
+
+              {/* 컬럼 바디 */}
+              <div className="flex-1 p-2 space-y-2 overflow-y-auto">
+                {col.items.length === 0 ? (
+                  <div className="text-[11px] text-slate-300 text-center py-4">
+                    할 일이 없어요.
+                  </div>
+                ) : (
+                  col.items.map((t) => (
+                    <motion.div
+                      key={t.id}
+                      layout
+                      whileHover={{
+                        scale: 1.02,
+                        translateY: -1,
+                      }}
+                      className="group bg-white rounded-xl border border-slate-100 shadow-[0_10px_16px_rgba(15,23,42,0.06)] px-3 py-2 cursor-grab active:cursor-grabbing"
+                      draggable
+                      onDragStart={() =>
+                        handleCardDragStart(t.id)
+                      }
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <input
+                              type="checkbox"
+                              className="w-3 h-3 mt-0.5 accent-sky-500"
+                              checked={
+                                t.status === "done" || t.done
+                              }
+                              onChange={() =>
+                                toggleDone(t.id)
+                              }
+                            />
+                            <p
+                              className={
+                                "text-xs font-medium text-slate-800 break-words " +
+                                (t.status === "done" || t.done
+                                  ? "line-through text-slate-400"
+                                  : "")
+                              }
+                            >
+                              {t.title || t.text}
+                            </p>
+                          </div>
+                          {t.note && (
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              {t.note}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1">
+                          {getPriorityBadge(
+                            t.priority || "normal"
+                          )}
+                          {t.dueDate && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-50 text-amber-600 border border-amber-100">
+                              마감:{" "}
+                              {formatDateLabel(t.dueDate)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* 상태 변경 작은 버튼 */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {statusKey !== "todo" && (
+                            <button
+                              className="px-2 py-0.5 rounded-full text-[10px] border border-slate-200 text-slate-500 hover:bg-slate-50"
+                              onClick={() =>
+                                updateStatus(t.id, "todo")
+                              }
+                            >
+                              ↩ 할 일
+                            </button>
+                          )}
+                          {statusKey !== "doing" && (
+                            <button
+                              className="px-2 py-0.5 rounded-full text-[10px] border border-slate-200 text-slate-500 hover:bg-slate-50"
+                              onClick={() =>
+                                updateStatus(t.id, "doing")
+                              }
+                            >
+                              ⚙ 진행
+                            </button>
+                          )}
+                          {statusKey !== "done" && (
+                            <button
+                              className="px-2 py-0.5 rounded-full text-[10px] border border-emerald-200 text-emerald-500 hover:bg-emerald-50"
+                              onClick={() =>
+                                updateStatus(t.id, "done")
+                              }
+                            >
+                              ✅ 완료
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </div>
+          )
+        )}
+      </div>
+    </section>
   );
 }
