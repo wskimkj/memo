@@ -17,10 +17,8 @@ export default function TodoBoard({ todos, setTodos }) {
   const doneCount = list.filter((t) => t.done).length;
 
   const sorted = [...list].sort((a, b) => {
-    // 즐겨찾기 먼저
     if (a.favorite && !b.favorite) return -1;
     if (!a.favorite && b.favorite) return 1;
-    // 미완료 먼저
     if (a.done && !b.done) return 1;
     if (!a.done && b.done) return -1;
     return 0;
@@ -73,46 +71,48 @@ export default function TodoBoard({ todos, setTodos }) {
   }
 
   return (
-    <section className="glass p-4 flex items-center justify-center h-full">
-      {/* 모바일 카드 느낌의 전체 컨테이너 */}
-      <div className="w-full max-w-xs md:max-w-sm h-full max-h-[640px] rounded-[32px] bg-gradient-to-b from-[#d9d3ff] via-[#f8ddff] to-[#ffc7da] shadow-[0_24px_50px_rgba(148,163,184,0.45)] overflow-hidden flex flex-col">
-        {/* 상단 헤더 */}
-        <div className="px-4 pt-3 pb-2 text-white">
-          <div className="flex items-center justify-between text-[11px] mb-3">
-            <button className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+    <section className="glass p-4 h-full flex flex-col">
+      {/* 전체 카드: 오른쪽 영역 높이를 꽉 채우도록 h-full */}
+      <div className="w-full h-full rounded-[32px] bg-gradient-to-b from-[#d9d3ff] via-[#f8ddff] to-[#ffc7da] shadow-[0_24px_50px_rgba(148,163,184,0.45)] overflow-hidden flex flex-col">
+        {/* 상단 헤더 : 패딩/폰트 줄여서 컴팩트하게 */}
+        <div className="px-4 pt-2 pb-2 text-white border-b border-white/15">
+          {/* 작은 탑바 */}
+          <div className="flex items-center justify-between text-[10px] mb-2">
+            <button className="w-5 h-5 rounded-full bg-white/18 flex items-center justify-center">
               ☰
             </button>
             <span className="opacity-80">To Do List</span>
-            <button className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+            <button className="w-5 h-5 rounded-full bg-white/18 flex items-center justify-center">
               🔍
             </button>
           </div>
 
-          <div className="mb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight">
-                  오늘 할 일
-                </h2>
-                <p className="text-[11px] opacity-80">
-                  {doneCount}/{totalCount} 완료
-                </p>
-              </div>
-              <div className="flex gap-1 text-[11px] opacity-80">
-                <button className="px-2 py-0.5 rounded-full bg-white/15 border border-white/25">
-                  ✏️
-                </button>
-                <button className="px-2 py-0.5 rounded-full bg-white/15 border border-white/25">
-                  ⋯
-                </button>
-              </div>
+          {/* 제목 + 진행률 (아주 작게) */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight">
+                오늘 할 일
+              </h2>
+              <p className="text-[10px] opacity-75">
+                가볍게 적고 체크만 해도 충분해요.
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <span className="px-2 py-0.5 rounded-full bg-white/15 border border-white/25 text-[10px]">
+                완료 {doneCount} / 전체 {totalCount}
+              </span>
             </div>
           </div>
 
-          {/* 입력 바 */}
-          <div className="mb-2">
-            <div className="flex items-center rounded-2xl bg-white/12 border border-white/30 px-3 py-2 backdrop-blur-md">
-              <span className="mr-2 text-sm">＋</span>
+          {/* 입력 바 (높이만 딱 맞게) */}
+          <div className="mt-2">
+            <div className="flex items-center rounded-2xl bg-white/12 border border-white/30 px-3 py-1.5 backdrop-blur-md">
+              <button
+                onClick={addTodo}
+                className="mr-2 w-5 h-5 rounded-full bg-white/70 text-[#7b5cfa] flex items-center justify-center text-xs font-bold shadow-sm"
+              >
+                +
+              </button>
               <input
                 className="flex-1 bg-transparent border-none outline-none text-[11px] placeholder:text-white/60 text-white"
                 placeholder="Add a task…"
@@ -126,8 +126,8 @@ export default function TodoBoard({ todos, setTodos }) {
           </div>
         </div>
 
-        {/* 리스트 영역 */}
-        <div className="flex-1 px-3 pb-4 pt-1 overflow-y-auto space-y-2">
+        {/* 리스트 영역 : flex-1 + 스크롤 → 세로 꽉 채우고 목록 길게 */}
+        <div className="flex-1 px-3 pb-3 pt-2 overflow-y-auto space-y-2">
           {sorted.length === 0 ? (
             <div className="h-full flex items-center justify-center text-[11px] text-white/80">
               아직 할 일이 없어요. 위에서 새로 추가해보세요 ✨
