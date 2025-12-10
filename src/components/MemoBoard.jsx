@@ -283,7 +283,6 @@ export default function MemoBoard({
         <div>
           <h2 className="text-sm font-semibold text-gray-800">메모 보드</h2>
           <p className="text-[11px] text-gray-400">
-            스티커 메모 느낌으로 가볍게 적고, 그룹으로 정리해보세요.
           </p>
         </div>
         <div className="text-right text-[11px] text-gray-400">
@@ -326,7 +325,6 @@ export default function MemoBoard({
             메모 그룹 (폴더)
           </span>
           <span className="text-[11px] text-gray-400">
-            그룹을 드래그해서 순서를 바꾸고, 폴더를 눌러 전환할 수 있어요.
           </span>
         </div>
 
@@ -487,13 +485,13 @@ export default function MemoBoard({
             ref={draftEditorRef}
             className="min-h-[110px] max-h-64 overflow-y-auto px-4 pb-3 pt-2 text-sm leading-relaxed text-gray-800 outline-none"
             contentEditable
-            data-placeholder="여기에 새 메모를 자유롭게 적어보세요. URL을 붙여넣거나, 이미지 URL을 추가할 수 있어요."
+            data-placeholder="여기에 새 메모를 자유롭게 적어보세요."
             onInput={(e) => setDraftHtml(e.currentTarget.innerHTML)}
           />
 
           <div className="flex items-center justify-between px-4 pb-3">
             <span className="text-[11px] text-amber-500">
-              엔터로 줄바꿈, 위 툴바로 서식·링크·이미지를 넣을 수 있어요.
+        
             </span>
             <button
               onClick={addMemo}
