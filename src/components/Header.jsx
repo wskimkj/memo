@@ -10,34 +10,26 @@ export default function Header({ remaining, total }) {
     year: "numeric",
     month: "long",
     day: "numeric",
-    weekday: "short"
+    weekday: "short",
   });
 
   return (
-    <header className="flex flex-col gap-3 mb-6">
-      <div className="flex items-center justify-between">
-        <motion.div
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-1"
-        >
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Memo • Workspace
-          </h1>
-          <div className="text-xs text-gray-500 flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-full bg-white/70 border border-white/60 shadow-sm">
-              오늘 · {dateLabel}
-            </span>
-          </div>
-        </motion.div>
-
-        <div className="flex items-center gap-3">
-          <div className="text-sm text-gray-600 text-right">
+    <header className="flex flex-col gap-2 mb-4">
+      {/* 상단 한 줄 요약 (제목 없이) */}
+      <div className="flex items-center justify-between text-[11px] text-gray-500">
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded-full bg-white/70 border border-white/60 shadow-sm">
+            오늘 · {dateLabel}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span>
             남은 할 일{" "}
-            <span className="font-semibold text-gray-900">{remaining}</span> /
-            전체{" "}
-            <span className="font-semibold text-gray-900">{total}</span>
-          </div>
+            <span className="font-semibold text-violet-600">
+              {remaining}
+            </span>{" "}
+            / 전체 {total}
+          </span>
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -48,19 +40,21 @@ export default function Header({ remaining, total }) {
         </div>
       </div>
 
-      <div className="w-full h-2 rounded-full bg-white/60 border border-white/70 overflow-hidden shadow-inner">
+      {/* 진행 바 (살짝만 남기기) */}
+      <div className="w-full h-1.5 rounded-full bg-white/60 border border-white/70 overflow-hidden shadow-inner">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${percent}%` }}
           transition={{ type: "spring", stiffness: 80, damping: 20 }}
           className="h-full"
           style={{
-            background: "linear-gradient(90deg,#7b5cfa,#a084ff)"
+            background: "linear-gradient(90deg,#7b5cfa,#a084ff)",
           }}
         />
       </div>
 
-      <div className="text-xs text-gray-500 flex items-center justify-between">
+      {/* 아래 설명 한 줄 */}
+      <div className="text-[11px] text-gray-500 flex items-center justify-between">
         <span>
           완료된 작업 {done}개 · 진행률 {percent}%
         </span>
