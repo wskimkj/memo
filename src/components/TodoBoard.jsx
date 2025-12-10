@@ -94,12 +94,12 @@ export default function TodoBoard({ todos, setTodos }) {
                 오늘 할 일
               </h2>
               <p className="text-[10px] opacity-75">
-                가볍게 적고 체크만 해도 충분해요.
+                
               </p>
             </div>
             <div className="flex flex-col items-end gap-1">
               <span className="px-2 py-0.5 rounded-full bg-white/15 border border-white/25 text-[10px]">
-                완료 {doneCount} / 전체 {totalCount}
+                 {doneCount} /  {totalCount}
               </span>
             </div>
           </div>
