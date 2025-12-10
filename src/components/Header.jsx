@@ -60,7 +60,7 @@ export default function Header({ remaining, total }) {
         </span>
         {total === 0 && (
           <span className="text-[11px] text-gray-400">
-            첫 할 일을 추가해서 오늘을 디자인해보세요 ✨
+            
           </span>
         )}
       </div>
