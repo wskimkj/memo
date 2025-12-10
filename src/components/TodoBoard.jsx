@@ -130,7 +130,7 @@ export default function TodoBoard({ todos, setTodos }) {
         <div className="flex-1 px-3 pb-3 pt-2 overflow-y-auto space-y-2">
           {sorted.length === 0 ? (
             <div className="h-full flex items-center justify-center text-[11px] text-white/80">
-              아직 할 일이 없어요. 위에서 새로 추가해보세요 ✨
+            
             </div>
           ) : (
             sorted.map((t) => (
