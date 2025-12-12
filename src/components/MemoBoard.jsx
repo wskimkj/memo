@@ -354,7 +354,7 @@ export default function MemoBoard({
               onClick={pasteClipboardToActiveGroup}
               className="px-2 py-1 rounded-full border border-amber-300 bg-white/70 hover:bg-white text-[11px] font-medium"
             >
-              현재 그룹에 붙여넣기
+          
             </button>
             <button
               onClick={() => setClipboardMemo(null)}
@@ -370,7 +370,6 @@ export default function MemoBoard({
       <div className="mb-4">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-medium text-gray-600">
-            메모 그룹 탭
           </span>
           <span className="text-[10px] text-gray-400">
           </span>
