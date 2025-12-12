@@ -708,8 +708,7 @@ export default function MemoBoard({
                         </div>
                       )}
                     </div>
-                  </div>
-
+               
                   {/* 본문 영역 */}
                   <div className="px-3 pb-2">
                     <div
