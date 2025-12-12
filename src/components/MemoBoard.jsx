@@ -670,16 +670,6 @@ export default function MemoBoard({
                           className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
                           title="잘라내기"
                         >
-                          ✂️
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeMemo(m.id);
-                          }}
-                          className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-red-500"
-                          title="삭제"
-                        >
                           ×
                         </button>
                         {/* 색상 선택 버튼 */}
