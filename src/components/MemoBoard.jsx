@@ -605,8 +605,7 @@ export default function MemoBoard({
       <div className="flex-1 flex flex-col">
         {currentMemos.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-xs text-gray-400 text-center px-4">
-            아직 이 그룹에는 메모가 없어요. 위에서 새 메모를 만들고,
-            리뷰 답변에 자주 쓰는 문장을 차곡차곡 모아보세요 ✨
+        
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
