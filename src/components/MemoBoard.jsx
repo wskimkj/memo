@@ -11,6 +11,23 @@ const PASTEL_NOTE_COLORS = [
   "#F5F5F4", // 그레이
 ];
 
+// 그룹 탭 색 (원노트 느낌)
+const GROUP_TAB_COLORS = [
+  "#BFDBFE", // 연파랑
+  "#FBCFE8", // 연핑크
+  "#FDE68A", // 연노랑
+  "#C7D2FE", // 연보라
+  "#BBF7D0", // 연민트
+];
+
+// 그룹 이름으로 항상 같은 색 나오게
+function getGroupColor(name) {
+  if (!name) return GROUP_TAB_COLORS[0];
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  return GROUP_TAB_COLORS[sum % GROUP_TAB_COLORS.length];
+}
+
 export default function MemoBoard({
   memos,
   setMemos,
@@ -20,18 +37,19 @@ export default function MemoBoard({
   setGroupsOrder,
 }) {
   const [newGroup, setNewGroup] = useState("");
+  const [showNewGroupInput, setShowNewGroupInput] = useState(false);
+
   const [draftHtml, setDraftHtml] = useState("");
   const [clipboardMemo, setClipboardMemo] = useState(null);
 
-  // 그룹 이름 편집
   const [editingGroup, setEditingGroup] = useState(null);
   const [editingGroupValue, setEditingGroupValue] = useState("");
 
-  // 메모 → 그룹 드랍 이동용 상태
+  // 메모 → 그룹 드래그 이동 상태
   const [draggingMemoId, setDraggingMemoId] = useState(null);
   const [memoDragOverGroup, setMemoDragOverGroup] = useState(null);
 
-  // 색상 선택 팝업용 상태
+  // 색상 선택 팝업 (메모별)
   const [colorPickerFor, setColorPickerFor] = useState(null);
 
   const draftEditorRef = useRef(null);
@@ -60,6 +78,7 @@ export default function MemoBoard({
     });
     setActiveGroup(g);
     setNewGroup("");
+    setShowNewGroupInput(false);
   }
 
   // 그룹 삭제
@@ -99,7 +118,7 @@ export default function MemoBoard({
     }
   }
 
-  // 그룹 이름 편집 시작/저장/취소
+  // 그룹 이름 편집
   function startEditGroup(name) {
     setEditingGroup(name);
     setEditingGroupValue(name);
@@ -150,13 +169,24 @@ export default function MemoBoard({
     });
   }
 
-  // 메모 텍스트 업데이트
+  // 메모 본문 HTML 업데이트
   function updateMemoHtml(id, html) {
     const plain = stripHtml(html);
     setMemos((prev) => {
       const copy = { ...prev };
       copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
         m.id === id ? { ...m, html, text: plain } : m
+      );
+      return copy;
+    });
+  }
+
+  // 메모 제목 업데이트
+  function updateMemoTitle(id, title) {
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
+        m.id === id ? { ...m, title } : m
       );
       return copy;
     });
@@ -173,7 +203,7 @@ export default function MemoBoard({
     });
   }
 
-  // 메모를 다른 그룹으로 이동 (드래그 & 드롭용)
+  // 메모를 다른 그룹으로 이동 (드래그 & 드롭)
   function moveMemoToGroup(id, targetGroup) {
     if (!targetGroup || targetGroup === activeGroup) return;
     setMemos((prev) => {
@@ -222,6 +252,7 @@ export default function MemoBoard({
     const plain = stripHtml(base.html || base.text || "");
     const nextMemo = {
       id: newId,
+      title: base.title || plain.slice(0, 30),
       text: plain,
       html: base.html,
       createdAt: new Date().toISOString(),
@@ -244,8 +275,10 @@ export default function MemoBoard({
     const plain = stripHtml(html);
     if (!plain) return;
     const group = activeGroup || groups[0] || "기본";
+    const firstLine = plain.split("\n")[0] || "";
     const nextMemo = {
       id: Date.now().toString(),
+      title: firstLine.slice(0, 30), // 기본 제목
       text: plain,
       html,
       createdAt: new Date().toISOString(),
@@ -314,8 +347,8 @@ export default function MemoBoard({
       {clipboardMemo && (
         <div className="mb-3 flex items-center justify-between rounded-xl border border-dashed border-amber-300/80 bg-amber-50/70 px-3 py-2 text-[11px] text-amber-800">
           <span>
-            "{clipboardMemo.memo?.text?.slice(0, 20) || "메모"}" 를{" "}
-            {clipboardMemo.mode === "cut" ? "잘라냈어요" : "복사했어요"}.
+            "{clipboardMemo.memo?.title || clipboardMemo.memo?.text?.slice(0, 20) || "메모"}
+            " 를 {clipboardMemo.mode === "cut" ? "잘라냈어요" : "복사했어요"}.
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -334,115 +367,140 @@ export default function MemoBoard({
         </div>
       )}
 
-      {/* 상단: 그룹(폴더) 바 */}
+      {/* 상단: 그룹 탭 바 (원노트 스타일) */}
       <div className="mb-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-medium text-gray-600">
-            메모 그룹 (폴더)
+            메모 그룹 탭
           </span>
           <span className="text-[10px] text-gray-400">
-            메모를 끌어서 그룹 위에 올리면 이동돼요.
+            메모를 끌어서 탭으로 옮기면 그룹 이동
           </span>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {groups.map((g) => (
-            <div
-              key={g}
-              className={
-                "relative flex items-center gap-1 shrink-0 rounded-full px-0.5 py-0.5 transition-colors " +
-                (memoDragOverGroup === g
-                  ? "bg-violet-50/80"
-                  : "bg-transparent")
-              }
-              onDragOver={(e) => {
-                if (draggingMemoId) {
-                  e.preventDefault();
-                  setMemoDragOverGroup(g);
-                }
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (draggingMemoId) {
-                  moveMemoToGroup(draggingMemoId, g);
-                  setDraggingMemoId(null);
-                  setMemoDragOverGroup(null);
-                }
-              }}
-              onDragLeave={() => {
-                if (memoDragOverGroup === g) setMemoDragOverGroup(null);
-              }}
-            >
-              {editingGroup === g ? (
-                <input
-                  autoFocus
-                  value={editingGroupValue}
-                  onChange={(e) => setEditingGroupValue(e.target.value)}
-                  onBlur={submitEditGroup}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+        <div className="relative">
+          {/* 탭 아래 하얀 바 */}
+          <div className="h-7 bg-white/90 rounded-t-md border border-gray-200 border-b-0" />
+
+          {/* 탭들 */}
+          <div className="absolute left-2 top-0 flex items-end gap-1 pr-14">
+            {groups.map((g) => {
+              const active = g === activeGroup;
+              const color = getGroupColor(g);
+              return (
+                <div
+                  key={g}
+                  className={
+                    "group relative flex items-center " +
+                    (memoDragOverGroup === g ? "drop-shadow-md" : "")
+                  }
+                  onDragOver={(e) => {
+                    if (draggingMemoId) {
                       e.preventDefault();
-                      submitEditGroup();
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setEditingGroup(null);
-                      setEditingGroupValue("");
+                      setMemoDragOverGroup(g);
                     }
                   }}
-                  className="px-3 py-1.5 rounded-full text-xs border border-indigo-200 bg-white/90 focus:outline-none focus:ring-1 focus:ring-indigo-300 min-w-[80px]"
-                />
-              ) : (
-                <button
-                  onClick={() => setActiveGroup(g)}
-                  className={
-                    "px-3 py-1.5 rounded-full text-xs border transition-colors cursor-pointer select-none " +
-                    (activeGroup === g
-                      ? "bg-gradient-to-r from-indigo-500 to-violet-400 text-white border-transparent shadow-sm"
-                      : "bg-white/80 border-gray-200 text-gray-700 hover:bg-white")
-                  }
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggingMemoId) {
+                      moveMemoToGroup(draggingMemoId, g);
+                      setDraggingMemoId(null);
+                      setMemoDragOverGroup(null);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (memoDragOverGroup === g) setMemoDragOverGroup(null);
+                  }}
                 >
-                  {g}
-                </button>
-              )}
+                  {editingGroup === g ? (
+                    <input
+                      autoFocus
+                      value={editingGroupValue}
+                      onChange={(e) => setEditingGroupValue(e.target.value)}
+                      onBlur={submitEditGroup}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          submitEditGroup();
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setEditingGroup(null);
+                          setEditingGroupValue("");
+                        }
+                      }}
+                      className="px-3 py-1 text-xs rounded-t-md border border-gray-300 bg-white/95 outline-none"
+                      style={{ marginBottom: 1 }}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setActiveGroup(g)}
+                      className={
+                        "px-3 py-1 text-xs rounded-t-md border border-gray-300 border-b-0 shadow-sm transition-all " +
+                        (active
+                          ? "font-semibold text-gray-900"
+                          : "text-gray-600 hover:-translate-y-[1px]")
+                      }
+                      style={{
+                        backgroundColor: color,
+                        marginBottom: active ? 0 : 1,
+                      }}
+                    >
+                      {g}
+                    </button>
+                  )}
 
-              {activeGroup === g && editingGroup !== g && (
-                <button
-                  onClick={() => startEditGroup(g)}
-                  className="ml-1 text-[11px] text-gray-400 hover:text-indigo-500"
-                  title="그룹 이름 편집"
-                >
-                  ✏️
-                </button>
-              )}
+                  {/* 탭 우측 작은 아이콘들 */}
+                  {active && editingGroup !== g && (
+                    <div className="absolute -right-4 bottom-[3px] flex flex-col gap-[2px] opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => startEditGroup(g)}
+                        className="text-[10px] text-gray-500 hover:text-indigo-500"
+                        title="이름 수정"
+                      >
+                        ✏️
+                      </button>
+                      {groups.length > 1 && (
+                        <button
+                          onClick={() => deleteGroup(g)}
+                          className="text-[10px] text-gray-400 hover:text-red-500"
+                          title="삭제"
+                        >
+                          🗑
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
-              {activeGroup === g && groups.length > 1 && (
-                <button
-                  onClick={() => deleteGroup(g)}
-                  className="ml-0.5 text-[11px] text-gray-300 hover:text-red-500"
-                  title="그룹 삭제"
-                >
-                  🗑
-                </button>
-              )}
-            </div>
-          ))}
-
-          {/* 새 그룹 생성 */}
-          <div className="flex items-center gap-1 shrink-0 ml-2">
-            <input
-              value={newGroup}
-              onChange={(e) => setNewGroup(e.target.value)}
-              placeholder="새 그룹"
-              className="px-2 py-1 text-xs rounded-full border border-dashed border-gray-300 bg-white/70 focus:outline-none focus:ring-1 focus:ring-indigo-300 w-28"
-            />
+            {/* + 탭 */}
             <button
-              onClick={createGroup}
-              className="px-2 py-1 rounded-full text-xs bg-indigo-500/90 text-white hover:bg-indigo-500 shadow-sm"
+              onClick={() => setShowNewGroupInput((v) => !v)}
+              className="ml-1 px-3 py-1 text-xs rounded-t-md border border-dashed border-gray-300 border-b-0 bg-gray-50 hover:bg-white hover:-translate-y-[1px] transition-all"
             >
               +
             </button>
           </div>
+
+          {/* 새 그룹 입력창 */}
+          {showNewGroupInput && (
+            <div className="mt-8 flex items-center gap-2 px-2">
+              <input
+                value={newGroup}
+                onChange={(e) => setNewGroup(e.target.value)}
+                placeholder="새 그룹 이름"
+                className="px-2 py-1 text-xs rounded-md border border-gray-300 flex-1 bg-white/90 outline-none focus:ring-1 focus:ring-indigo-300"
+              />
+              <button
+                onClick={createGroup}
+                className="px-2 py-1 text-xs rounded-md bg-indigo-500 text-white hover:bg-indigo-600"
+              >
+                추가
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -547,7 +605,7 @@ export default function MemoBoard({
         </div>
       </div>
 
-      {/* 메모 리스트 - 파스텔 스티커 메모 */}
+      {/* 메모 리스트 - 파스텔 스티커 메모 + 제목 필드 */}
       <div className="flex-1 flex flex-col">
         {currentMemos.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-xs text-gray-400 text-center px-4">
@@ -559,7 +617,6 @@ export default function MemoBoard({
             {currentMemos.map((m) => {
               const contentHtml =
                 m.html || (m.text ? m.text.replace(/\n/g, "<br />") : "");
-              const firstLine = (m.text || "").split("\n")[0] || "제목 없음";
               const color = m.color || getRandomColor();
 
               return (
@@ -580,15 +637,17 @@ export default function MemoBoard({
                   {/* 상단 테이프 느낌 */}
                   <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-16 h-2 rounded-b-full bg-white/70 shadow" />
 
-                  {/* 카드 상단 헤더 */}
+                  {/* 카드 상단: 제목 + 액션 */}
                   <div className="px-3 pt-3 pb-2 flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="text-[11px] text-gray-500 mb-0.5">
-                        메모
-                      </div>
-                      <div className="text-xs font-semibold text-gray-800 truncate">
-                        {firstLine}
-                      </div>
+                      <input
+                        value={m.title || ""}
+                        onChange={(e) =>
+                          updateMemoTitle(m.id, e.target.value)
+                        }
+                        placeholder="제목을 입력하세요"
+                        className="w-full text-xs font-semibold text-gray-900 bg-transparent border-b border-white/60 focus:outline-none focus:border-gray-700 pb-0.5 placeholder:text-gray-400"
+                      />
                     </div>
 
                     <div className="flex flex-col items-end gap-1 relative">
@@ -673,7 +732,7 @@ export default function MemoBoard({
                     />
                   </div>
 
-                  {/* 하단 메타 (그룹 표시는 제거, 시간만) */}
+                  {/* 하단 메타 (작성시간만) */}
                   <div className="px-3 pb-3 flex items-center justify-between gap-2 text-[11px] text-gray-600">
                     {m.createdAt && (
                       <span className="text-[10px] text-gray-500">
@@ -687,7 +746,7 @@ export default function MemoBoard({
                       </span>
                     )}
                     <span className="text-[10px] text-gray-400">
-                      드래그해서 그룹으로 이동
+                      드래그해서 그룹 탭으로 이동
                     </span>
                   </div>
                 </motion.div>
