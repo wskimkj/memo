@@ -1,6 +1,16 @@
 import React, { useState, useRef } from "react";
 import { motion } from "framer-motion";
 
+const PASTEL_NOTE_COLORS = [
+  "#FEF3C7", // 노랑
+  "#E0F2FE", // 하늘
+  "#EDE9FE", // 연보라
+  "#DCFCE7", // 민트
+  "#FCE7F3", // 핑크
+  "#FFEDD5", // 살구
+  "#F5F5F4", // 그레이
+];
+
 export default function MemoBoard({
   memos,
   setMemos,
@@ -27,6 +37,12 @@ export default function MemoBoard({
   const groups = Array.from(
     new Set([...(groupsOrder || []), ...allMemoGroups])
   );
+
+  // 파스텔 컬러 하나 뽑기
+  function getRandomColor() {
+    const idx = Math.floor(Math.random() * PASTEL_NOTE_COLORS.length);
+    return PASTEL_NOTE_COLORS[idx];
+  }
 
   // 그룹 만들기
   function createGroup() {
@@ -213,6 +229,17 @@ export default function MemoBoard({
     });
   }
 
+  // 메모 색상 변경
+  function updateMemoColor(id, color) {
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
+        m.id === id ? { ...m, color } : m
+      );
+      return copy;
+    });
+  }
+
   // 메모를 다른 그룹으로 이동
   function moveMemoToGroup(id, targetGroup) {
     if (!targetGroup || targetGroup === activeGroup) return;
@@ -266,6 +293,7 @@ export default function MemoBoard({
       text: plain,
       html: base.html,
       createdAt: new Date().toISOString(),
+      color: base.color || getRandomColor(),
     };
     setMemos((prev) => {
       const copy = { ...prev };
@@ -289,6 +317,7 @@ export default function MemoBoard({
       text: plain,
       html,
       createdAt: new Date().toISOString(),
+      color: getRandomColor(),
     };
     setMemos((prev) => {
       const copy = { ...prev };
@@ -486,7 +515,7 @@ export default function MemoBoard({
         </div>
       </div>
 
-      {/* 상단: 스티커 메모 입력 카드 */}
+      {/* 상단: 새 메모 입력 카드 (연한 노란 메모 느낌 유지) */}
       <div className="mb-4">
         <div className="rounded-2xl bg-gradient-to-br from-[#fef3c7]/80 via-white/95 to-white/95 border border-amber-100/80 shadow-[0_18px_40px_rgba(251,191,36,0.18)]">
           <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -587,129 +616,6 @@ export default function MemoBoard({
         </div>
       </div>
 
-      {/* 메모 리스트 */}
+      {/* 메모 리스트 - 파스텔 스티커 메모 */}
       <div className="flex-1 flex flex-col">
-        {currentMemos.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-xs text-gray-400 text-center px-4">
-            아직 이 그룹에는 메모가 없어요. 위에서 새 메모를 만들고,
-            리뷰 답변에 자주 쓰는 문장을 차곡차곡 모아보세요 ✨
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-            {currentMemos.map((m) => {
-              const contentHtml =
-                m.html || (m.text ? m.text.replace(/\n/g, "<br />") : "");
-              const firstLine = (m.text || "").split("\n")[0] || "제목 없음";
-
-              return (
-                <motion.div
-                  key={m.id}
-                  whileHover={{ scale: 1.02, translateY: -2 }}
-                  className="relative rounded-2xl bg-gradient-to-b from-[#fef9c3] via-[#fffbeb] to-[#fef3c7] shadow-[0_16px_30px_rgba(251,191,36,0.35)] border border-amber-100 overflow-hidden"
-                >
-                  {/* 상단 핀 느낌 점 */}
-                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-amber-300 shadow-[0_0_0_4px_rgba(254,252,232,1)]" />
-
-                  {/* 카드 상단 헤더 (제목 + 액션 버튼들) */}
-                  <div className="px-3 pt-3 pb-2 flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[11px] uppercase tracking-wide text-amber-500 mb-0.5">
-                        메모
-                      </div>
-                      <div className="text-xs font-semibold text-amber-900 truncate">
-                        {firstLine}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 text-[11px]">
-                      <button
-                        onClick={() => copyMemo(m)}
-                        className="px-1.5 py-0.5 rounded-full bg-white/70 border border-amber-200 hover:bg-white"
-                        title="복사"
-                      >
-                        📄
-                      </button>
-                      <button
-                        onClick={() => cutMemo(m)}
-                        className="px-1.5 py-0.5 rounded-full bg-white/70 border border-amber-200 hover:bg-white text-amber-700"
-                        title="잘라내기"
-                      >
-                        ✂️
-                      </button>
-                      <button
-                        onClick={() => removeMemo(m.id)}
-                        className="px-1.5 py-0.5 rounded-full bg-white/70 border border-amber-200 hover:bg-white text-red-500"
-                        title="삭제"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 본문 영역 */}
-                  <div className="px-3 pb-2">
-                    <div
-                      className="text-sm whitespace-pre-wrap leading-relaxed focus:outline-none bg-amber-50/60 rounded-xl px-2.5 py-2 max-h-52 overflow-y-auto"
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={(e) =>
-                        updateMemoHtml(m.id, e.currentTarget.innerHTML)
-                      }
-                      dangerouslySetInnerHTML={{ __html: contentHtml }}
-                    />
-                  </div>
-
-                  {/* 하단 메타/액션 영역 */}
-                  <div className="px-3 pb-3 flex items-center justify-between gap-2 text-[11px]">
-                    <div className="flex flex-col gap-1 text-amber-800/80">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100/90 border border-amber-200/80">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                        그룹: <span className="font-medium">{activeGroup}</span>
-                      </span>
-                      {m.createdAt && (
-                        <span className="text-[10px] text-amber-500">
-                          {new Date(m.createdAt).toLocaleString("ko-KR", {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}{" "}
-                          작성
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <select
-                        defaultValue=""
-                        onChange={(e) => {
-                          moveMemoToGroup(m.id, e.target.value);
-                          e.target.value = "";
-                        }}
-                        className="border border-amber-200 rounded-full px-2 py-1 bg-white/80 text-[11px]"
-                      >
-                        <option value="">그룹 이동</option>
-                        {groups
-                          .filter((g) => g !== activeGroup)
-                          .map((g) => (
-                            <option key={g} value={g}>
-                              {g}로 이동
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </aside>
-  );
-}
-
-// 간단한 HTML -> 텍스트 변환
-function stripHtml(html) {
-  if (!html) return "";
-  return html.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
-}
+        {curre
