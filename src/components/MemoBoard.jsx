@@ -330,7 +330,7 @@ export default function MemoBoard({
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-800">메모 보드</h2>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[14px] text-gray-400">
           </p>
         </div>
         <div className="text-right text-[11px] text-gray-400">
@@ -581,7 +581,7 @@ export default function MemoBoard({
             ref={draftEditorRef}
             className="min-h-[110px] max-h-64 overflow-y-auto px-4 pb-3 pt-2 text-sm leading-relaxed text-gray-800 outline-none"
             contentEditable
-            data-placeholder="여기에 새 메모를 자유롭게 적어보세요."
+            data-placeholder="자유롭게 적어보세요."
             onInput={(e) => setDraftHtml(e.currentTarget.innerHTML)}
           />
 
@@ -710,7 +710,7 @@ export default function MemoBoard({
                   {/* 본문 영역 */}
                   <div className="px-3 pb-2">
                     <div
-                      className="text-sm whitespace-pre-wrap leading-relaxed focus:outline-none rounded-md px-2 py-2 max-h-40 overflow-y-auto bg-white/30"
+                      className="text-[9px] whitespace-pre-wrap leading-relaxed focus:outline-none rounded-md px-2 py-2 max-h-40 overflow-y-auto bg-white/30"
                       contentEditable
                       suppressContentEditableWarning
                       onBlur={(e) =>
