@@ -618,4 +618,148 @@ export default function MemoBoard({
 
       {/* 메모 리스트 - 파스텔 스티커 메모 */}
       <div className="flex-1 flex flex-col">
-        {curre
+        {currentMemos.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-xs text-gray-400 text-center px-4">
+            아직 이 그룹에는 메모가 없어요. 위에서 새 메모를 만들고,
+            리뷰 답변에 자주 쓰는 문장을 차곡차곡 모아보세요 ✨
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+            {currentMemos.map((m) => {
+              const contentHtml =
+                m.html || (m.text ? m.text.replace(/\n/g, "<br />") : "");
+              const firstLine = (m.text || "").split("\n")[0] || "제목 없음";
+              const color = m.color || getRandomColor();
+
+              return (
+                <motion.div
+                  key={m.id}
+                  whileHover={{ scale: 1.02, translateY: -2 }}
+                  className="relative rounded-xl shadow-md border border-black/5 overflow-hidden"
+                  style={{
+                    backgroundColor: color,
+                  }}
+                >
+                  {/* 상단 작은 테이프 느낌 */}
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-16 h-2 rounded-b-full bg-white/70 shadow" />
+
+                  {/* 카드 상단 헤더 (제목 + 액션 버튼들) */}
+                  <div className="px-3 pt-3 pb-2 flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] text-gray-500 mb-0.5">
+                        메모
+                      </div>
+                      <div className="text-xs font-semibold text-gray-800 truncate">
+                        {firstLine}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-0.5 text-[11px]">
+                        <button
+                          onClick={() => copyMemo(m)}
+                          className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
+                          title="복사"
+                        >
+                          📄
+                        </button>
+                        <button
+                          onClick={() => cutMemo(m)}
+                          className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
+                          title="잘라내기"
+                        >
+                          ✂️
+                        </button>
+                        <button
+                          onClick={() => removeMemo(m.id)}
+                          className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-red-500"
+                          title="삭제"
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      {/* 색상 선택 점 */}
+                      <div className="flex items-center gap-1">
+                        {PASTEL_NOTE_COLORS.map((c) => (
+                          <button
+                            key={c}
+                            onClick={() => updateMemoColor(m.id, c)}
+                            className={
+                              "w-3 h-3 rounded-full border border-black/10 focus:outline-none" +
+                              (c === color ? " ring-2 ring-black/20" : "")
+                            }
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 본문 영역 */}
+                  <div className="px-3 pb-2">
+                    <div
+                      className="text-sm whitespace-pre-wrap leading-relaxed focus:outline-none rounded-md px-2 py-2 max-h-40 overflow-y-auto bg-white/30"
+                      contentEditable
+                      suppressContentEditableWarning
+                      onBlur={(e) =>
+                        updateMemoHtml(m.id, e.currentTarget.innerHTML)
+                      }
+                      dangerouslySetInnerHTML={{ __html: contentHtml }}
+                    />
+                  </div>
+
+                  {/* 하단 메타/액션 영역 */}
+                  <div className="px-3 pb-3 flex items-center justify-between gap-2 text-[11px]">
+                    <div className="flex flex-col gap-1 text-gray-600">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/60 border border-white/80">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                        그룹: <span className="font-medium">{activeGroup}</span>
+                      </span>
+                      {m.createdAt && (
+                        <span className="text-[10px] text-gray-500">
+                          {new Date(m.createdAt).toLocaleString("ko-KR", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}{" "}
+                          작성
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          moveMemoToGroup(m.id, e.target.value);
+                          e.target.value = "";
+                        }}
+                        className="border border-gray-200 rounded-full px-2 py-1 bg-white/80 text-[11px]"
+                      >
+                        <option value="">그룹 이동</option>
+                        {groups
+                          .filter((g) => g !== activeGroup)
+                          .map((g) => (
+                            <option key={g} value={g}>
+                              {g}로 이동
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+// 간단한 HTML -> 텍스트 변환
+function stripHtml(html) {
+  if (!html) return "";
+  return html.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+}
