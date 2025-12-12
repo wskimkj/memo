@@ -331,7 +331,6 @@ export default function MemoBoard({
         <div>
           <h2 className="text-sm font-semibold text-gray-800">메모 보드</h2>
           <p className="text-[11px] text-gray-400">
-            리뷰 답변에 쓸 문장을 그때그때 모아두고 조합해 보세요.
           </p>
         </div>
         <div className="text-right text-[11px] text-gray-400">
@@ -374,7 +373,6 @@ export default function MemoBoard({
             메모 그룹 탭
           </span>
           <span className="text-[10px] text-gray-400">
-            메모를 끌어서 탭으로 옮기면 그룹 이동
           </span>
         </div>
 
@@ -590,7 +588,6 @@ export default function MemoBoard({
 
           <div className="flex items-center justify-between px-4 pb-3">
             <span className="text-[11px] text-amber-500">
-              자주 쓰는 표현, 완성된 답변, 문장 조각들을 저장해 두고 재활용해 보세요.
             </span>
             <button
               onClick={addMemo}
@@ -645,47 +642,51 @@ export default function MemoBoard({
                         onChange={(e) =>
                           updateMemoTitle(m.id, e.target.value)
                         }
-                        placeholder="제목을 입력하세요"
+                        placeholder="제목"
                         className="w-full text-xs font-semibold text-gray-900 bg-transparent border-b border-white/60 focus:outline-none focus:border-gray-700 pb-0.5 placeholder:text-gray-400"
                       />
                     </div>
 
-                    <div className="flex flex-col items-end gap-1 relative">
-                      <div className="flex items-center gap-0.5 text-[11px]">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyMemo(m);
-                          }}
-                          className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
-                          title="복사"
-                        >
-                          📄
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            cutMemo(m);
-                          }}
-                          className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
-                          title="잘라내기"
-                        >
-                          ×
-                        </button>
-                        {/* 색상 선택 버튼 */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setColorPickerFor((prev) =>
-                              prev === m.id ? null : m.id
-                            );
-                          }}
-                          className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px]"
-                          title="색상 변경"
-                        >
-                          🎨
-                        </button>
-                      </div>
+                    <div className="flex gap-1 absolute top-1 right-1">
+
+  {/* 🎨 색상 선택 */}
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      setColorPickerFor((prev) => (prev === m.id ? null : m.id));
+    }}
+    className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px]"
+    title="색상 변경"
+  >
+    🎨
+  </button>
+
+  {/* 📄 복사 */}
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      copyMemo(m);
+    }}
+    className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
+    title="복사"
+  >
+    📄
+  </button>
+
+  {/* × 잘라내기 */}
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      cutMemo(m);
+    }}
+    className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
+    title="잘라내기"
+  >
+    ×
+  </button>
+
+</div>
+
 
                       {/* 색상 선택 팝업 */}
                       {colorPickerFor === m.id && (
@@ -735,9 +736,7 @@ export default function MemoBoard({
                         작성
                       </span>
                     )}
-                    <span className="text-[10px] text-gray-400">
-                      드래그해서 그룹 탭으로 이동
-                    </span>
+                  
                   </div>
                 </motion.div>
               );
