@@ -19,6 +19,26 @@ function getGroupColor(name) {
   for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
   return GROUP_TAB_COLORS[sum % GROUP_TAB_COLORS.length];
 }
+function ToolbarBtn({ disabled, onClick, label, title, className = "" }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+      className={
+        "h-8 min-w-8 px-2 rounded-lg border text-[12px] transition " +
+        (disabled
+          ? "opacity-40 cursor-not-allowed border-gray-200 text-gray-400"
+          : "border-gray-200 text-gray-700 hover:bg-gray-50 active:bg-gray-100") +
+        " " +
+        className
+      }
+    >
+      {label}
+    </button>
+  );
+}
 
 export default function MemoBoard({
   memos,
@@ -1029,210 +1049,211 @@ export default function MemoBoard({
         </div>
       )}
 
-      {/* 새 메모 입력 카드 */}
-      <div className="mb-4">
-        <div className="rounded-2xl bg-gradient-to-br from-[#fef3c7]/80 via-white/95 to-white/95 border border-amber-100/80 shadow-[0_18px_40px_rgba(251,191,36,0.18)]">
-          <div className="flex items-center justify-between px-4 pt-3 pb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_0_4px_rgba(250,250,249,1)]" />
-              <span className="text-xs font-medium text-amber-900">
-                {editingMemoId ? "메모 편집" : "새 메모"}
-              </span>
-
-              {isGroupLocked && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
-                  🔒 읽기전용(추가/편집 불가)
-                </span>
-              )}
-
-              {editingMemoId && !isGroupLocked && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/70 border border-amber-200 text-amber-800">
-                  ✏️ 수정 모드
-                </span>
-              )}
-            </div>
-
-            <button
-              onClick={clearDraft}
-              disabled={isGroupLocked}
-              className={
-                "text-[11px] " +
-                (isGroupLocked ? "text-gray-300 cursor-not-allowed" : "text-amber-500 hover:text-amber-700")
-              }
-            >
-              비우기
-            </button>
-          </div>
-
-          {/* 메인 입력 툴바 */}
-          <div className="px-4 pb-2 border-t border-amber-100/80">
-            <div
-              className={
-                "mt-2 rounded-xl border border-amber-100/80 bg-white/60 px-2 py-2 flex flex-wrap items-center gap-1 text-[11px] text-gray-700 " +
-                (isGroupLocked ? "opacity-50" : "")
-              }
-              onMouseDown={(e) => {
-                if (e.target?.tagName !== "SELECT") e.preventDefault();
-              }}
-            >
-              <select
-                className="px-2 py-1 rounded bg-white/70 border"
-                defaultValue="Pretendard"
-                disabled={isGroupLocked}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  saveDraftSelection();
-                }}
-                onChange={(e) => applyDraftFormat("fontName", e.target.value)}
-                title="폰트"
-              >
-                <option value="Pretendard">Pretendard</option>
-                <option value="Arial">Arial</option>
-                <option value="Calibri">Calibri</option>
-                <option value="Times New Roman">Times</option>
-              </select>
-
-              <select
-                className="px-2 py-1 rounded bg-white/70 border"
-                defaultValue="3"
-                disabled={isGroupLocked}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  saveDraftSelection();
-                }}
-                onChange={(e) => applyDraftFormat("fontSize", e.target.value)}
-                title="크기"
-              >
-                <option value="1">XS</option>
-                <option value="2">S</option>
-                <option value="3">M</option>
-                <option value="4">L</option>
-                <option value="5">XL</option>
-                <option value="6">2XL</option>
-                <option value="7">3XL</option>
-              </select>
-
-              <span className="mx-1 h-4 w-px bg-amber-200/80" />
-
-              <button disabled={isGroupLocked} onClick={() => applyDraftFormat("bold")} className="px-2 py-1 rounded hover:bg-amber-100/80 font-semibold">
-                B
-              </button>
-              <button disabled={isGroupLocked} onClick={() => applyDraftFormat("italic")} className="px-2 py-1 rounded hover:bg-amber-100/80 italic">
-                I
-              </button>
-              <button disabled={isGroupLocked} onClick={() => applyDraftFormat("underline")} className="px-2 py-1 rounded hover:bg-amber-100/80 underline">
-                U
-              </button>
-
-              <span className="mx-1 h-4 w-px bg-amber-200/80" />
-
-              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("justifyLeft")} title="왼쪽 정렬">
-                ⟸
-              </button>
-              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("justifyCenter")} title="가운데 정렬">
-                ≡
-              </button>
-              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("justifyRight")} title="오른쪽 정렬">
-                ⟹
-              </button>
-
-              <span className="mx-1 h-4 w-px bg-amber-200/80" />
-
-              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("insertUnorderedList")} title="글머리">
-                •
-              </button>
-              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("insertOrderedList")} title="번호">
-                1.
-              </button>
-              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={insertCheckboxListToDraft} title="체크박스 리스트">
-                ☑︎
-              </button>
-              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={insertTableToDraft} title="표 삽입">
-                ▦
-              </button>
-
-              <span className="mx-1 h-4 w-px bg-amber-200/80" />
-
-              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={handleInsertLinkToDraft} title="링크">
-                🔗
-              </button>
-              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={handleInsertImageToDraft} title="이미지">
-                🖼
-              </button>
-
-              <select
-                className="px-2 py-1 rounded bg-white/70 border"
-                defaultValue=""
-                disabled={isGroupLocked}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  saveDraftSelection();
-                }}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) return;
-                  applyDraftFormat("hiliteColor", v);
-                  applyDraftFormat("backColor", v);
-                  e.target.value = "";
-                }}
-                title="하이라이트"
-              >
-                <option value="">🖍 하이라이트</option>
-                <option value="#fde68a">노랑</option>
-                <option value="#bbf7d0">민트</option>
-                <option value="#bfdbfe">하늘</option>
-                <option value="#fbcfe8">핑크</option>
-                <option value="#e9d5ff">보라</option>
-                <option value="#ffffff">없음</option>
-              </select>
-
-              <button disabled={isGroupLocked} className="ml-auto px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("removeFormat")} title="서식 지우기">
-                서식지움
-              </button>
-
-              <span className="ml-2 text-[10px] text-amber-600">현재 그룹: {activeGroup}</span>
-            </div>
-          </div>
-
-          {/* 메인 편집기 */}
-          <div
-            ref={draftEditorRef}
-            className={
-              "min-h-[110px] max-h-64 overflow-y-auto px-4 pb-3 pt-2 text-sm leading-relaxed text-gray-800 outline-none " +
-              (isGroupLocked ? "opacity-60 cursor-not-allowed" : "")
-            }
-            contentEditable={!isGroupLocked}
-            data-placeholder="자유롭게 적어보세요."
-            onInput={(e) => setDraftHtml(e.currentTarget.innerHTML)}
-            onMouseUp={saveDraftSelection}
-            onKeyUp={saveDraftSelection}
-            onFocus={saveDraftSelection}
-          />
-
-          <div className="flex items-center justify-between px-4 pb-3">
-            <button
-              onClick={upsertMemoFromDraft}
-              disabled={isGroupLocked}
-              className={
-                "px-3 py-1.5 rounded-full text-xs font-medium text-white shadow-md hover:shadow-lg transition-shadow " +
-                (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
-              }
-              style={{ background: "linear-gradient(90deg,#f97316,#fbbf24)" }}
-            >
-              {editingMemoId ? "수정 저장" : "메모 추가"}
-            </button>
-
-            {editingMemoId && !isGroupLocked && (
-              <button
-                onClick={clearDraft}
-                className="px-3 py-1.5 rounded-full text-xs font-medium border border-amber-200 bg-white/70 hover:bg-white"
-              >
-                편집 취소
-              </button>
-            )}
-          </div>
+     {/* 새 메모 입력 카드 (리디자인) */}
+<div className="mb-4">
+  <div className="rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.08)] overflow-hidden">
+    {/* 헤더 */}
+    <div className="px-5 py-4 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-indigo-400" />
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-gray-900">
+            {editingMemoId ? "메모 편집" : "새 메모"}
+          </span>
+          <span className="text-[11px] text-gray-500">
+            {editingMemoId ? "서식 포함 수정 후 저장" : "서식 포함 메모를 빠르게 작성"}
+          </span>
         </div>
+
+        {isGroupLocked && (
+          <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+            🔒 읽기전용
+          </span>
+        )}
+        {!isGroupLocked && editingMemoId && (
+          <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+            ✏️ 수정 모드
+          </span>
+        )}
       </div>
+
+      <button
+        onClick={clearDraft}
+        disabled={isGroupLocked}
+        className={
+          "text-[12px] px-3 py-1.5 rounded-full border transition " +
+          (isGroupLocked
+            ? "opacity-40 cursor-not-allowed border-gray-200 text-gray-400"
+            : "border-gray-200 text-gray-700 hover:bg-gray-50")
+        }
+      >
+        비우기
+      </button>
+    </div>
+
+    {/* 툴바 */}
+    <div
+      className={
+        "px-5 pb-3 " + (isGroupLocked ? "opacity-50" : "")
+      }
+      onMouseDown={(e) => {
+        // select는 기본 동작 필요
+        if (e.target?.tagName !== "SELECT") e.preventDefault();
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-gray-200 bg-white/80 px-2 py-2">
+        {/* 폰트 */}
+        <select
+          className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-[12px]"
+          defaultValue="Pretendard"
+          disabled={isGroupLocked}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            saveDraftSelection();
+          }}
+          onChange={(e) => applyDraftFormat("fontName", e.target.value)}
+        >
+          <option value="Pretendard">Pretendard</option>
+          <option value="Arial">Arial</option>
+          <option value="Calibri">Calibri</option>
+          <option value="Times New Roman">Times</option>
+        </select>
+
+        {/* 크기 */}
+        <select
+          className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-[12px]"
+          defaultValue="3"
+          disabled={isGroupLocked}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            saveDraftSelection();
+          }}
+          onChange={(e) => applyDraftFormat("fontSize", e.target.value)}
+        >
+          <option value="1">XS</option>
+          <option value="2">S</option>
+          <option value="3">M</option>
+          <option value="4">L</option>
+          <option value="5">XL</option>
+          <option value="6">2XL</option>
+          <option value="7">3XL</option>
+        </select>
+
+        <div className="mx-1 h-6 w-px bg-gray-200" />
+
+        {/* 서식 버튼들 */}
+        <ToolbarBtn disabled={isGroupLocked} onClick={() => applyDraftFormat("bold")} label="B" />
+        <ToolbarBtn disabled={isGroupLocked} onClick={() => applyDraftFormat("italic")} label="I" className="italic" />
+        <ToolbarBtn disabled={isGroupLocked} onClick={() => applyDraftFormat("underline")} label="U" className="underline" />
+
+        <div className="mx-1 h-6 w-px bg-gray-200" />
+
+        <ToolbarBtn disabled={isGroupLocked} onClick={() => applyDraftFormat("justifyLeft")} label="⟸" />
+        <ToolbarBtn disabled={isGroupLocked} onClick={() => applyDraftFormat("justifyCenter")} label="≡" />
+        <ToolbarBtn disabled={isGroupLocked} onClick={() => applyDraftFormat("justifyRight")} label="⟹" />
+
+        <div className="mx-1 h-6 w-px bg-gray-200" />
+
+        <ToolbarBtn disabled={isGroupLocked} onClick={() => applyDraftFormat("insertUnorderedList")} label="•" />
+        <ToolbarBtn disabled={isGroupLocked} onClick={() => applyDraftFormat("insertOrderedList")} label="1." />
+
+        <ToolbarBtn disabled={isGroupLocked} onClick={insertCheckboxListToDraft} label="☑︎" title="체크박스" />
+        <ToolbarBtn disabled={isGroupLocked} onClick={insertTableToDraft} label="▦" title="표" />
+
+        <div className="mx-1 h-6 w-px bg-gray-200" />
+
+        <ToolbarBtn disabled={isGroupLocked} onClick={handleInsertLinkToDraft} label="🔗" title="링크" />
+        <ToolbarBtn disabled={isGroupLocked} onClick={handleInsertImageToDraft} label="🖼" title="이미지" />
+
+        <select
+          className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-[12px]"
+          defaultValue=""
+          disabled={isGroupLocked}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            saveDraftSelection();
+          }}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!v) return;
+            applyDraftFormat("hiliteColor", v);
+            applyDraftFormat("backColor", v);
+            e.target.value = "";
+          }}
+        >
+          <option value="">🖍 하이라이트</option>
+          <option value="#fde68a">노랑</option>
+          <option value="#bbf7d0">민트</option>
+          <option value="#bfdbfe">하늘</option>
+          <option value="#fbcfe8">핑크</option>
+          <option value="#e9d5ff">보라</option>
+          <option value="#ffffff">없음</option>
+        </select>
+
+        <button
+          disabled={isGroupLocked}
+          onClick={() => applyDraftFormat("removeFormat")}
+          className={
+            "ml-auto h-8 px-3 rounded-lg text-[12px] border transition " +
+            (isGroupLocked
+              ? "opacity-40 cursor-not-allowed border-gray-200 text-gray-400"
+              : "border-gray-200 text-gray-700 hover:bg-gray-50")
+          }
+          title="서식 지우기"
+        >
+          서식지움
+        </button>
+      </div>
+
+      <div className="mt-2 text-[11px] text-gray-500">
+        현재 그룹: <span className="font-medium text-gray-800">{activeGroup}</span>
+      </div>
+    </div>
+
+    {/* 에디터 */}
+    <div className="px-5 pb-4">
+      <div
+        ref={draftEditorRef}
+        className={
+          "min-h-[160px] max-h-72 overflow-y-auto rounded-2xl border bg-white px-4 py-4 text-[14px] leading-relaxed text-gray-900 outline-none transition " +
+          (isGroupLocked
+            ? "opacity-60 cursor-not-allowed border-gray-200"
+            : "border-gray-200 focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-100")
+        }
+        contentEditable={!isGroupLocked}
+        data-placeholder="자유롭게 적어보세요…"
+        onInput={(e) => setDraftHtml(e.currentTarget.innerHTML)}
+        onMouseUp={saveDraftSelection}
+        onKeyUp={saveDraftSelection}
+        onFocus={saveDraftSelection}
+      />
+
+      {/* 액션 */}
+      <div className="mt-4 flex items-center justify-end gap-2">
+        {editingMemoId && !isGroupLocked && (
+          <button
+            onClick={clearDraft}
+            className="h-10 px-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium"
+          >
+            취소
+          </button>
+        )}
+        <button
+          onClick={upsertMemoFromDraft}
+          disabled={isGroupLocked}
+          className={
+            "h-10 px-5 rounded-xl text-sm font-semibold text-white shadow-sm transition " +
+            (isGroupLocked ? "opacity-40 cursor-not-allowed" : "hover:shadow-md")
+          }
+          style={{ background: "linear-gradient(90deg,#6366F1,#22C55E)" }}
+        >
+          {editingMemoId ? "수정 저장" : "메모 추가"}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
       {/* 메모 리스트 */}
       <div className="flex-1 flex flex-col">
