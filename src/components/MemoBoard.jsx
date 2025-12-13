@@ -31,12 +31,13 @@ export default function MemoBoard({
   const [newGroup, setNewGroup] = useState("");
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
 
-  // 메인(새 메모) 편집기 HTML
+  // 메인(새 메모) 편집기
   const [draftHtml, setDraftHtml] = useState("");
   const draftEditorRef = useRef(null);
 
-  // ✅ “수정” 모드일 때 편집 중인 memo id
+  // ✅ “수정” 모드 (편집 중인 메모)
   const [editingMemoId, setEditingMemoId] = useState(null);
+  const [editingMemoGroup, setEditingMemoGroup] = useState(null);
 
   // ✅ 드롭다운/툴바 클릭해도 selection 유지 (draft 전용)
   const selectionRef = useRef(null);
@@ -112,8 +113,6 @@ export default function MemoBoard({
     } catch {}
     document.execCommand(command, false, value ?? null);
     saveDraftSelection();
-
-    // onInput이 안 타는 케이스 대비
     if (draftEditorRef.current) setDraftHtml(draftEditorRef.current.innerHTML);
   }
 
@@ -182,6 +181,20 @@ export default function MemoBoard({
     };
   }, []);
 
+  // ✅ 편집 중에 그룹 바꾸면 자동 취소(저장 그룹 꼬임 방지)
+  useEffect(() => {
+    if (!editingMemoId) return;
+    if (!editingMemoGroup) return;
+    if (activeGroup !== editingMemoGroup) {
+      // 그룹 변경 시 편집 취소
+      setEditingMemoId(null);
+      setEditingMemoGroup(null);
+      setDraftHtml("");
+      selectionRef.current = null;
+      if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
+    }
+  }, [activeGroup, editingMemoId, editingMemoGroup]);
+
   // =========================
   // 그룹 CRUD
   // =========================
@@ -245,6 +258,11 @@ export default function MemoBoard({
     });
 
     if (activeGroup === name) setActiveGroup(targetGroup);
+
+    // 편집 중이던 그룹 삭제하면 편집도 취소
+    if (editingMemoGroup === name) {
+      clearDraft();
+    }
   }
 
   function startEditGroup(name) {
@@ -295,6 +313,9 @@ export default function MemoBoard({
     });
 
     if (activeGroup === oldName) setActiveGroup(newName);
+
+    // 편집 그룹 이름 변경되면 추적 업데이트
+    if (editingMemoGroup === oldName) setEditingMemoGroup(newName);
 
     setEditingGroup(null);
     setEditingGroupValue("");
@@ -380,11 +401,7 @@ export default function MemoBoard({
       return copy;
     });
 
-    // 삭제한 게 편집중이던 메모면 draft도 초기화
-    if (editingMemoId === id) {
-      setEditingMemoId(null);
-      clearDraft();
-    }
+    if (editingMemoId === id) clearDraft();
   }
 
   function updateMemoTitle(id, title) {
@@ -432,21 +449,18 @@ export default function MemoBoard({
       return copy;
     });
 
-    // 이동한 게 편집중이던 메모면: 그대로 편집은 가능하지만 저장 그룹이 activeGroup 기준이라 혼동됨
-    // => 안전하게 편집모드 종료(원하면 유지로 바꿔도 됨)
-    if (editingMemoId === id) {
-      setEditingMemoId(null);
-      clearDraft();
-    }
+    if (editingMemoId === id) clearDraft();
   }
 
   // =========================
-  // 저장된 메모 -> 메인 편집기로 불러오기 (서식 그대로)
+  // 저장된 메모 -> 메인 편집기로 불러오기
   // =========================
   function loadMemoToDraft(memo) {
     if (!memo || isGroupLocked) return;
 
     setEditingMemoId(memo.id);
+    setEditingMemoGroup(activeGroup);
+
     const html = memo.html || (memo.text ? plainToHtml(memo.text) : "");
 
     setDraftHtml(html);
@@ -484,10 +498,7 @@ export default function MemoBoard({
       return copy;
     });
 
-    if (editingMemoId === memo.id) {
-      setEditingMemoId(null);
-      clearDraft();
-    }
+    if (editingMemoId === memo.id) clearDraft();
   }
 
   function pasteClipboardToActiveGroup() {
@@ -518,12 +529,13 @@ export default function MemoBoard({
   }
 
   // =========================
-  // 메인 편집기 저장: 추가 / 수정 저장
+  // Draft 저장: 추가 / 수정 저장
   // =========================
   function clearDraft() {
     if (isGroupLocked) return;
     setDraftHtml("");
     setEditingMemoId(null);
+    setEditingMemoGroup(null);
     selectionRef.current = null;
     if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
   }
@@ -535,32 +547,30 @@ export default function MemoBoard({
     const plain = htmlToPlain(html);
     if (!plain) return;
 
-    const group = activeGroup || groups[0] || "기본";
     const firstLine = plain.split("\n")[0] || "";
+    const group = activeGroup || groups[0] || "기본";
 
-    // ✅ 수정 저장
-    if (editingMemoId) {
+    // ✅ 수정 저장: 편집 시작했던 그룹에서만 저장
+    if (editingMemoId && editingMemoGroup) {
+      const targetGroup = editingMemoGroup;
+
       setMemos((prev) => {
         const copy = { ...prev };
-        copy[group] = (copy[group] || []).map((m) =>
+        const list = copy[targetGroup] || [];
+        copy[targetGroup] = list.map((m) =>
           m.id === editingMemoId
             ? {
                 ...m,
                 html,
                 text: plain,
                 title: m.title || firstLine.slice(0, 30),
-                // 필요하면 updatedAt 같은 것도 추가 가능
               }
             : m
         );
         return copy;
       });
 
-      // draft 초기화
-      setEditingMemoId(null);
-      setDraftHtml("");
-      selectionRef.current = null;
-      if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
+      clearDraft();
       return;
     }
 
@@ -587,7 +597,7 @@ export default function MemoBoard({
   }
 
   // =========================
-  // 우클릭 메뉴 위치: 커서 근처에 띄우기
+  // 우클릭 메뉴 위치: 커서 근처
   // =========================
   function openGroupMenu(e, groupName) {
     e.preventDefault();
@@ -626,6 +636,15 @@ export default function MemoBoard({
   }, [currentMemos]);
 
   const memoMenuTarget = memoMenu.memoId ? memoById.get(memoMenu.memoId) : null;
+
+  // =========================
+  // 드래그 시작 시 "입력/버튼/링크 클릭"이면 드래그 막기
+  // =========================
+  function shouldBlockDragStart(target) {
+    if (!target) return false;
+    const el = target.closest?.("input, textarea, button, select, a, label");
+    return !!el;
+  }
 
   // =========================
   // UI
@@ -902,10 +921,7 @@ export default function MemoBoard({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-2 text-[11px] text-gray-500 border-b bg-gray-50">
-            메모:{" "}
-            <span className="font-medium text-gray-800">
-              {memoMenuTarget.title || "제목 없음"}
-            </span>
+            메모: <span className="font-medium text-gray-800">{memoMenuTarget.title || "제목 없음"}</span>
           </div>
 
           <button
@@ -1013,7 +1029,7 @@ export default function MemoBoard({
         </div>
       )}
 
-      {/* 새 메모 입력 카드 (서식 기능은 여기만) */}
+      {/* 새 메모 입력 카드 */}
       <div className="mb-4">
         <div className="rounded-2xl bg-gradient-to-br from-[#fef3c7]/80 via-white/95 to-white/95 border border-amber-100/80 shadow-[0_18px_40px_rgba(251,191,36,0.18)]">
           <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -1022,11 +1038,13 @@ export default function MemoBoard({
               <span className="text-xs font-medium text-amber-900">
                 {editingMemoId ? "메모 편집" : "새 메모"}
               </span>
+
               {isGroupLocked && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
                   🔒 읽기전용(추가/편집 불가)
                 </span>
               )}
+
               {editingMemoId && !isGroupLocked && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/70 border border-amber-200 text-amber-800">
                   ✏️ 수정 모드
@@ -1039,9 +1057,7 @@ export default function MemoBoard({
               disabled={isGroupLocked}
               className={
                 "text-[11px] " +
-                (isGroupLocked
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-amber-500 hover:text-amber-700")
+                (isGroupLocked ? "text-gray-300 cursor-not-allowed" : "text-amber-500 hover:text-amber-700")
               }
             >
               비우기
@@ -1056,7 +1072,6 @@ export default function MemoBoard({
                 (isGroupLocked ? "opacity-50" : "")
               }
               onMouseDown={(e) => {
-                // 버튼은 포커스 유지 / select는 preventDefault 하면 안 됨
                 if (e.target?.tagName !== "SELECT") e.preventDefault();
               }}
             >
@@ -1099,111 +1114,49 @@ export default function MemoBoard({
 
               <span className="mx-1 h-4 w-px bg-amber-200/80" />
 
-              <button
-                type="button"
-                disabled={isGroupLocked}
-                onClick={() => applyDraftFormat("bold")}
-                className="px-2 py-1 rounded hover:bg-amber-100/80 font-semibold"
-              >
+              <button disabled={isGroupLocked} onClick={() => applyDraftFormat("bold")} className="px-2 py-1 rounded hover:bg-amber-100/80 font-semibold">
                 B
               </button>
-              <button
-                type="button"
-                disabled={isGroupLocked}
-                onClick={() => applyDraftFormat("italic")}
-                className="px-2 py-1 rounded hover:bg-amber-100/80 italic"
-              >
+              <button disabled={isGroupLocked} onClick={() => applyDraftFormat("italic")} className="px-2 py-1 rounded hover:bg-amber-100/80 italic">
                 I
               </button>
-              <button
-                type="button"
-                disabled={isGroupLocked}
-                onClick={() => applyDraftFormat("underline")}
-                className="px-2 py-1 rounded hover:bg-amber-100/80 underline"
-              >
+              <button disabled={isGroupLocked} onClick={() => applyDraftFormat("underline")} className="px-2 py-1 rounded hover:bg-amber-100/80 underline">
                 U
               </button>
 
               <span className="mx-1 h-4 w-px bg-amber-200/80" />
 
-              <button
-                disabled={isGroupLocked}
-                className="px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={() => applyDraftFormat("justifyLeft")}
-                title="왼쪽 정렬"
-              >
+              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("justifyLeft")} title="왼쪽 정렬">
                 ⟸
               </button>
-              <button
-                disabled={isGroupLocked}
-                className="px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={() => applyDraftFormat("justifyCenter")}
-                title="가운데 정렬"
-              >
+              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("justifyCenter")} title="가운데 정렬">
                 ≡
               </button>
-              <button
-                disabled={isGroupLocked}
-                className="px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={() => applyDraftFormat("justifyRight")}
-                title="오른쪽 정렬"
-              >
+              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("justifyRight")} title="오른쪽 정렬">
                 ⟹
               </button>
 
               <span className="mx-1 h-4 w-px bg-amber-200/80" />
 
-              <button
-                disabled={isGroupLocked}
-                className="px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={() => applyDraftFormat("insertUnorderedList")}
-                title="글머리"
-              >
+              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("insertUnorderedList")} title="글머리">
                 •
               </button>
-              <button
-                disabled={isGroupLocked}
-                className="px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={() => applyDraftFormat("insertOrderedList")}
-                title="번호"
-              >
+              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("insertOrderedList")} title="번호">
                 1.
               </button>
-
-              <button
-                disabled={isGroupLocked}
-                className="px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={insertCheckboxListToDraft}
-                title="체크박스 리스트"
-              >
+              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={insertCheckboxListToDraft} title="체크박스 리스트">
                 ☑︎
               </button>
-
-              <button
-                disabled={isGroupLocked}
-                className="px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={insertTableToDraft}
-                title="표 삽입"
-              >
+              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={insertTableToDraft} title="표 삽입">
                 ▦
               </button>
 
               <span className="mx-1 h-4 w-px bg-amber-200/80" />
 
-              <button
-                disabled={isGroupLocked}
-                className="px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={handleInsertLinkToDraft}
-                title="링크"
-              >
+              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={handleInsertLinkToDraft} title="링크">
                 🔗
               </button>
-              <button
-                disabled={isGroupLocked}
-                className="px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={handleInsertImageToDraft}
-                title="이미지"
-              >
+              <button disabled={isGroupLocked} className="px-2 py-1 rounded hover:bg-amber-100/80" onClick={handleInsertImageToDraft} title="이미지">
                 🖼
               </button>
 
@@ -1233,12 +1186,7 @@ export default function MemoBoard({
                 <option value="#ffffff">없음</option>
               </select>
 
-              <button
-                disabled={isGroupLocked}
-                className="ml-auto px-2 py-1 rounded hover:bg-amber-100/80"
-                onClick={() => applyDraftFormat("removeFormat")}
-                title="서식 지우기"
-              >
+              <button disabled={isGroupLocked} className="ml-auto px-2 py-1 rounded hover:bg-amber-100/80" onClick={() => applyDraftFormat("removeFormat")} title="서식 지우기">
                 서식지움
               </button>
 
@@ -1297,15 +1245,25 @@ export default function MemoBoard({
             {currentMemos.map((m) => {
               const contentHtml = m.html || (m.text ? plainToHtml(m.text) : "");
               const color = m.color || getRandomColor();
+              const isEditingThis = editingMemoId === m.id && editingMemoGroup === activeGroup;
 
               return (
                 <motion.div
                   key={m.id}
                   whileHover={{ scale: 1.02, translateY: -2 }}
-                  className="relative rounded-xl shadow-md border border-black/5 overflow-hidden cursor-grab active:cursor-grabbing"
+                  className={
+                    "relative rounded-xl shadow-md border overflow-hidden cursor-grab active:cursor-grabbing " +
+                    (isEditingThis ? "border-amber-500/70 ring-2 ring-amber-300/60" : "border-black/5")
+                  }
                   style={{ backgroundColor: color }}
                   draggable
-                  onDragStart={() => setDraggingMemoId(m.id)}
+                  onDragStart={(e) => {
+                    if (shouldBlockDragStart(e.target)) {
+                      e.preventDefault();
+                      return;
+                    }
+                    setDraggingMemoId(m.id);
+                  }}
                   onDragEnd={() => {
                     setDraggingMemoId(null);
                     setMemoDragOverGroup(null);
@@ -1313,6 +1271,12 @@ export default function MemoBoard({
                   onContextMenu={(e) => openMemoMenu(e, m.id)}
                 >
                   <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-16 h-2 rounded-b-full bg-white/70 shadow" />
+
+                  {isEditingThis && (
+                    <div className="absolute left-2 top-2 text-[10px] px-2 py-0.5 rounded-full bg-white/70 border border-amber-200 text-amber-800">
+                      ✏️ 편집중
+                    </div>
+                  )}
 
                   <div className="px-3 pt-3 pb-2 flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -1329,7 +1293,6 @@ export default function MemoBoard({
                     </div>
 
                     <div className="flex gap-1 absolute top-1 right-1">
-                      {/* ✅ 메인 편집기로 불러오기 */}
                       <button
                         disabled={isGroupLocked}
                         onClick={(e) => {
@@ -1407,7 +1370,7 @@ export default function MemoBoard({
                     )}
                   </div>
 
-                  {/* ✅ 저장된 메모: 서식(HTML) 그대로 표시 */}
+                  {/* 저장된 메모: 서식 그대로 표시 */}
                   <div className="px-3 pb-2">
                     <div
                       className={
@@ -1448,18 +1411,15 @@ function htmlToPlain(html) {
   if (!html) return "";
   let s = html;
 
-  // 줄바꿈 태그들
   s = s.replace(/<br\s*\/?>/gi, "\n");
   s = s.replace(/<\/div>/gi, "\n");
   s = s.replace(/<\/p>/gi, "\n");
   s = s.replace(/<\/li>/gi, "\n");
   s = s.replace(/<li[^>]*>/gi, "• ");
 
-  // 나머지 태그 제거
   s = s.replace(/<[^>]+>/g, "");
   s = s.replace(/&nbsp;/g, " ");
 
-  // 과한 개행 정리
   s = s.replace(/\n{3,}/g, "\n\n");
   return s.trim();
 }
