@@ -2,22 +2,16 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 const PASTEL_NOTE_COLORS = [
-  "#FEF3C7", // 노랑
-  "#E0F2FE", // 하늘
-  "#EDE9FE", // 연보라
-  "#DCFCE7", // 민트
-  "#FCE7F3", // 핑크
-  "#FFEDD5", // 살구
-  "#F5F5F4", // 그레이
+  "#FEF3C7",
+  "#E0F2FE",
+  "#EDE9FE",
+  "#DCFCE7",
+  "#FCE7F3",
+  "#FFEDD5",
+  "#F5F5F4",
 ];
 
-const GROUP_TAB_COLORS = [
-  "#BFDBFE", // 연파랑
-  "#FBCFE8", // 연핑크
-  "#FDE68A", // 연노랑
-  "#C7D2FE", // 연보라
-  "#BBF7D0", // 연민트
-];
+const GROUP_TAB_COLORS = ["#BFDBFE", "#FBCFE8", "#FDE68A", "#C7D2FE", "#BBF7D0"];
 
 function getGroupColor(name) {
   if (!name) return GROUP_TAB_COLORS[0];
@@ -37,7 +31,16 @@ export default function MemoBoard({
   const [newGroup, setNewGroup] = useState("");
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
 
+  // 메인(새 메모) 편집기 HTML
   const [draftHtml, setDraftHtml] = useState("");
+  const draftEditorRef = useRef(null);
+
+  // ✅ “수정” 모드일 때 편집 중인 memo id
+  const [editingMemoId, setEditingMemoId] = useState(null);
+
+  // ✅ 드롭다운/툴바 클릭해도 selection 유지 (draft 전용)
+  const selectionRef = useRef(null);
+
   const [clipboardMemo, setClipboardMemo] = useState(null);
 
   const [editingGroup, setEditingGroup] = useState(null);
@@ -48,11 +51,9 @@ export default function MemoBoard({
 
   const [colorPickerFor, setColorPickerFor] = useState(null);
 
-  // ✅ 그룹 색/잠금
   const [groupColorOverrides, setGroupColorOverrides] = useState({});
-  const [lockedGroups, setLockedGroups] = useState({}); // { [group]: true }
+  const [lockedGroups, setLockedGroups] = useState({});
 
-  // ✅ 그룹 우클릭 메뉴
   const [groupMenu, setGroupMenu] = useState({
     open: false,
     x: 0,
@@ -60,7 +61,6 @@ export default function MemoBoard({
     group: null,
   });
 
-  // ✅ 메모 우클릭 메뉴
   const [memoMenu, setMemoMenu] = useState({
     open: false,
     x: 0,
@@ -68,11 +68,23 @@ export default function MemoBoard({
     memoId: null,
   });
 
-  const draftEditorRef = useRef(null);
+  const allMemoGroups = Object.keys(memos || {});
+  const groups = useMemo(
+    () => Array.from(new Set([...(groupsOrder || []), ...allMemoGroups])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [groupsOrder, allMemoGroups.join("|")]
+  );
 
-  // ✅ selection(북마크) 저장/복원: "메인 새 메모 입력창" 전용
-  const selectionRef = useRef(null);
+  const currentMemos = memos?.[activeGroup] || [];
+  const isGroupLocked = !!lockedGroups[activeGroup];
 
+  function getRandomColor() {
+    return PASTEL_NOTE_COLORS[Math.floor(Math.random() * PASTEL_NOTE_COLORS.length)];
+  }
+
+  // =========================
+  // Selection 저장/복원 (draft 전용)
+  // =========================
   function saveDraftSelection() {
     const root = draftEditorRef.current;
     const sel = window.getSelection();
@@ -100,10 +112,14 @@ export default function MemoBoard({
     } catch {}
     document.execCommand(command, false, value ?? null);
     saveDraftSelection();
-    // draftHtml state도 최신화(드롭다운/버튼 클릭 시 onInput이 안 타는 케이스 대비)
+
+    // onInput이 안 타는 케이스 대비
     if (draftEditorRef.current) setDraftHtml(draftEditorRef.current.innerHTML);
   }
 
+  // =========================
+  // Draft 삽입 도구
+  // =========================
   function handleInsertLinkToDraft() {
     const url = window.prompt("링크 URL을 입력하세요");
     if (url) applyDraftFormat("createLink", url);
@@ -147,7 +163,9 @@ export default function MemoBoard({
     applyDraftFormat("insertHTML", html);
   }
 
-  // ✅ 메뉴 닫기
+  // =========================
+  // 메뉴 닫기
+  // =========================
   useEffect(() => {
     const closeAll = () => {
       setGroupMenu({ open: false, x: 0, y: 0, group: null });
@@ -164,37 +182,25 @@ export default function MemoBoard({
     };
   }, []);
 
-  const allMemoGroups = Object.keys(memos || {});
-  const groups = useMemo(
-    () => Array.from(new Set([...(groupsOrder || []), ...allMemoGroups])),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [groupsOrder, allMemoGroups.join("|")]
-  );
-
-  const currentMemos = memos[activeGroup] || [];
-  const isGroupLocked = !!lockedGroups[activeGroup];
-
-  function getRandomColor() {
-    const idx = Math.floor(Math.random() * PASTEL_NOTE_COLORS.length);
-    return PASTEL_NOTE_COLORS[idx];
-  }
-
-  // 그룹 만들기
+  // =========================
+  // 그룹 CRUD
+  // =========================
   function createGroup() {
     const g = newGroup.trim();
     if (!g) return;
+
     setMemos((prev) => ({ ...prev, [g]: prev[g] || [] }));
     setGroupsOrder((prev) => {
       const base = prev && prev.length ? prev : groups;
       if (base.includes(g)) return base;
       return [...base, g];
     });
+
     setActiveGroup(g);
     setNewGroup("");
     setShowNewGroupInput(false);
   }
 
-  // 그룹 삭제
   function deleteGroup(name) {
     if (!name) return;
     const otherGroups = groups.filter((g) => g !== name);
@@ -203,7 +209,7 @@ export default function MemoBoard({
       return;
     }
 
-    const memoCount = (memos[name] || []).length;
+    const memoCount = (memos?.[name] || []).length;
     const targetGroup = otherGroups[0];
 
     if (memoCount > 0) {
@@ -241,7 +247,6 @@ export default function MemoBoard({
     if (activeGroup === name) setActiveGroup(targetGroup);
   }
 
-  // 그룹 이름 편집
   function startEditGroup(name) {
     setEditingGroup(name);
     setEditingGroupValue(name);
@@ -251,6 +256,7 @@ export default function MemoBoard({
     const oldName = editingGroup;
     const newName = editingGroupValue.trim();
     if (!oldName) return;
+
     if (!newName || newName === oldName) {
       setEditingGroup(null);
       setEditingGroupValue("");
@@ -268,9 +274,7 @@ export default function MemoBoard({
       return copy;
     });
 
-    setGroupsOrder((prev) =>
-      (prev || []).map((g) => (g === oldName ? newName : g))
-    );
+    setGroupsOrder((prev) => (prev || []).map((g) => (g === oldName ? newName : g)));
 
     setGroupColorOverrides((prev) => {
       const next = { ...prev };
@@ -296,152 +300,6 @@ export default function MemoBoard({
     setEditingGroupValue("");
   }
 
-  // 메모 삭제
-  function removeMemo(id) {
-    if (!activeGroup) return;
-    setMemos((prev) => {
-      const copy = { ...prev };
-      copy[activeGroup] = (copy[activeGroup] || []).filter((m) => m.id !== id);
-      return copy;
-    });
-  }
-
-  // 메모 본문 업데이트(html)
-  function updateMemoHtml(id, html) {
-    const plain = htmlToPlain(html);
-    setMemos((prev) => {
-      const copy = { ...prev };
-      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
-        m.id === id ? { ...m, html, text: plain } : m
-      );
-      return copy;
-    });
-  }
-
-  // 메모 제목 업데이트
-  function updateMemoTitle(id, title) {
-    setMemos((prev) => {
-      const copy = { ...prev };
-      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
-        m.id === id ? { ...m, title } : m
-      );
-      return copy;
-    });
-  }
-
-  // 메모 색상 변경
-  function updateMemoColor(id, color) {
-    setMemos((prev) => {
-      const copy = { ...prev };
-      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
-        m.id === id ? { ...m, color } : m
-      );
-      return copy;
-    });
-  }
-
-  // 메모 이동
-  function moveMemoToGroup(id, targetGroup) {
-    if (!targetGroup || targetGroup === activeGroup) return;
-    setMemos((prev) => {
-      const copy = { ...prev };
-      const fromList = copy[activeGroup] || [];
-      const idx = fromList.findIndex((m) => m.id === id);
-      if (idx < 0) return prev;
-      const [memo] = fromList.splice(idx, 1);
-      copy[activeGroup] = fromList;
-      if (!copy[targetGroup]) copy[targetGroup] = [];
-      copy[targetGroup] = [memo, ...(copy[targetGroup] || [])];
-      return copy;
-    });
-  }
-
-  // 메모 복사 / 잘라내기
-  function copyMemo(memo) {
-    setClipboardMemo({
-      mode: "copy",
-      fromGroup: activeGroup,
-      memo: { ...memo, id: undefined },
-    });
-  }
-
-  function cutMemo(memo) {
-    setClipboardMemo({
-      mode: "cut",
-      fromGroup: activeGroup,
-      memo: { ...memo, id: undefined },
-    });
-    setMemos((prev) => {
-      const copy = { ...prev };
-      copy[activeGroup] = (copy[activeGroup] || []).filter(
-        (m) => m.id !== memo.id
-      );
-      return copy;
-    });
-  }
-
-  function pasteClipboardToActiveGroup() {
-    if (!clipboardMemo) return;
-    const targetGroup = activeGroup || groups[0] || "기본";
-    const base = clipboardMemo.memo;
-    if (!base) return;
-
-    const newId = Date.now().toString();
-    const plain = htmlToPlain(base.html || base.text || "");
-    const nextMemo = {
-      id: newId,
-      title: base.title || plain.slice(0, 30),
-      text: plain,
-      html: base.html || plainToHtml(plain),
-      createdAt: new Date().toISOString(),
-      color: base.color || getRandomColor(),
-    };
-
-    setMemos((prev) => {
-      const copy = { ...prev };
-      if (!copy[targetGroup]) copy[targetGroup] = [];
-      copy[targetGroup] = [nextMemo, ...(copy[targetGroup] || [])];
-      return copy;
-    });
-
-    if (clipboardMemo.mode === "cut") setClipboardMemo(null);
-  }
-
-  // 새 메모 추가
-  function addMemo() {
-    if (isGroupLocked) return;
-    const html = (draftHtml || "").trim();
-    const plain = htmlToPlain(html);
-    if (!plain) return;
-    const group = activeGroup || groups[0] || "기본";
-    const firstLine = plain.split("\n")[0] || "";
-    const nextMemo = {
-      id: Date.now().toString(),
-      title: firstLine.slice(0, 30),
-      text: plain,
-      html,
-      createdAt: new Date().toISOString(),
-      color: getRandomColor(),
-    };
-    setMemos((prev) => {
-      const copy = { ...prev };
-      if (!copy[group]) copy[group] = [];
-      copy[group] = [nextMemo, ...(copy[group] || [])];
-      return copy;
-    });
-    setDraftHtml("");
-    if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
-    selectionRef.current = null;
-  }
-
-  function clearDraft() {
-    if (isGroupLocked) return;
-    setDraftHtml("");
-    if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
-    selectionRef.current = null;
-  }
-
-  // 그룹 복제
   function duplicateGroup(name) {
     const baseName = `${name} - 복사본`;
     let candidate = baseName;
@@ -481,7 +339,6 @@ export default function MemoBoard({
     setGroupColorOverrides((prev) => ({ ...prev, [groupName]: color }));
   }
 
-  // 그룹 이동
   function moveGroup(name, dir) {
     setGroupsOrder((prev) => {
       const base = (prev && prev.length ? prev : groups).slice();
@@ -497,13 +354,13 @@ export default function MemoBoard({
     });
   }
 
-  // 섹션 링크 복사
+  function toggleGroupLock(name) {
+    setLockedGroups((prev) => ({ ...prev, [name]: !prev[name] }));
+  }
+
   async function copySectionLink(name) {
     const url =
-      window.location.origin +
-      window.location.pathname +
-      `?group=${encodeURIComponent(name)}`;
-
+      window.location.origin + window.location.pathname + `?group=${encodeURIComponent(name)}`;
     try {
       await navigator.clipboard.writeText(url);
       window.alert("섹션 링크를 복사했어요!");
@@ -512,38 +369,256 @@ export default function MemoBoard({
     }
   }
 
-  // 그룹 잠금
-  function toggleGroupLock(name) {
-    setLockedGroups((prev) => ({ ...prev, [name]: !prev[name] }));
+  // =========================
+  // 메모 CRUD
+  // =========================
+  function removeMemo(id) {
+    if (!activeGroup) return;
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).filter((m) => m.id !== id);
+      return copy;
+    });
+
+    // 삭제한 게 편집중이던 메모면 draft도 초기화
+    if (editingMemoId === id) {
+      setEditingMemoId(null);
+      clearDraft();
+    }
   }
 
-  // 그룹 우클릭 메뉴 열기
+  function updateMemoTitle(id, title) {
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
+        m.id === id ? { ...m, title } : m
+      );
+      return copy;
+    });
+  }
+
+  function updateMemoHtml(id, html) {
+    const plain = htmlToPlain(html);
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
+        m.id === id ? { ...m, html, text: plain } : m
+      );
+      return copy;
+    });
+  }
+
+  function updateMemoColor(id, color) {
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
+        m.id === id ? { ...m, color } : m
+      );
+      return copy;
+    });
+  }
+
+  function moveMemoToGroup(id, targetGroup) {
+    if (!targetGroup || targetGroup === activeGroup) return;
+    setMemos((prev) => {
+      const copy = { ...prev };
+      const fromList = copy[activeGroup] || [];
+      const idx = fromList.findIndex((m) => m.id === id);
+      if (idx < 0) return prev;
+      const [memo] = fromList.splice(idx, 1);
+      copy[activeGroup] = fromList;
+      if (!copy[targetGroup]) copy[targetGroup] = [];
+      copy[targetGroup] = [memo, ...(copy[targetGroup] || [])];
+      return copy;
+    });
+
+    // 이동한 게 편집중이던 메모면: 그대로 편집은 가능하지만 저장 그룹이 activeGroup 기준이라 혼동됨
+    // => 안전하게 편집모드 종료(원하면 유지로 바꿔도 됨)
+    if (editingMemoId === id) {
+      setEditingMemoId(null);
+      clearDraft();
+    }
+  }
+
+  // =========================
+  // 저장된 메모 -> 메인 편집기로 불러오기 (서식 그대로)
+  // =========================
+  function loadMemoToDraft(memo) {
+    if (!memo || isGroupLocked) return;
+
+    setEditingMemoId(memo.id);
+    const html = memo.html || (memo.text ? plainToHtml(memo.text) : "");
+
+    setDraftHtml(html);
+    if (draftEditorRef.current) {
+      draftEditorRef.current.innerHTML = html;
+      draftEditorRef.current.focus();
+    }
+
+    setTimeout(() => {
+      draftEditorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  }
+
+  // =========================
+  // 클립보드
+  // =========================
+  function copyMemo(memo) {
+    setClipboardMemo({
+      mode: "copy",
+      fromGroup: activeGroup,
+      memo: { ...memo, id: undefined },
+    });
+  }
+
+  function cutMemo(memo) {
+    setClipboardMemo({
+      mode: "cut",
+      fromGroup: activeGroup,
+      memo: { ...memo, id: undefined },
+    });
+
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).filter((m) => m.id !== memo.id);
+      return copy;
+    });
+
+    if (editingMemoId === memo.id) {
+      setEditingMemoId(null);
+      clearDraft();
+    }
+  }
+
+  function pasteClipboardToActiveGroup() {
+    if (!clipboardMemo) return;
+    const targetGroup = activeGroup || groups[0] || "기본";
+    const base = clipboardMemo.memo;
+    if (!base) return;
+
+    const newId = Date.now().toString();
+    const plain = htmlToPlain(base.html || base.text || "");
+    const nextMemo = {
+      id: newId,
+      title: base.title || plain.slice(0, 30),
+      text: plain,
+      html: base.html || plainToHtml(plain),
+      createdAt: new Date().toISOString(),
+      color: base.color || getRandomColor(),
+    };
+
+    setMemos((prev) => {
+      const copy = { ...prev };
+      if (!copy[targetGroup]) copy[targetGroup] = [];
+      copy[targetGroup] = [nextMemo, ...(copy[targetGroup] || [])];
+      return copy;
+    });
+
+    if (clipboardMemo.mode === "cut") setClipboardMemo(null);
+  }
+
+  // =========================
+  // 메인 편집기 저장: 추가 / 수정 저장
+  // =========================
+  function clearDraft() {
+    if (isGroupLocked) return;
+    setDraftHtml("");
+    setEditingMemoId(null);
+    selectionRef.current = null;
+    if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
+  }
+
+  function upsertMemoFromDraft() {
+    if (isGroupLocked) return;
+
+    const html = (draftHtml || "").trim();
+    const plain = htmlToPlain(html);
+    if (!plain) return;
+
+    const group = activeGroup || groups[0] || "기본";
+    const firstLine = plain.split("\n")[0] || "";
+
+    // ✅ 수정 저장
+    if (editingMemoId) {
+      setMemos((prev) => {
+        const copy = { ...prev };
+        copy[group] = (copy[group] || []).map((m) =>
+          m.id === editingMemoId
+            ? {
+                ...m,
+                html,
+                text: plain,
+                title: m.title || firstLine.slice(0, 30),
+                // 필요하면 updatedAt 같은 것도 추가 가능
+              }
+            : m
+        );
+        return copy;
+      });
+
+      // draft 초기화
+      setEditingMemoId(null);
+      setDraftHtml("");
+      selectionRef.current = null;
+      if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
+      return;
+    }
+
+    // ✅ 새 메모 추가
+    const nextMemo = {
+      id: Date.now().toString(),
+      title: firstLine.slice(0, 30),
+      text: plain,
+      html,
+      createdAt: new Date().toISOString(),
+      color: getRandomColor(),
+    };
+
+    setMemos((prev) => {
+      const copy = { ...prev };
+      if (!copy[group]) copy[group] = [];
+      copy[group] = [nextMemo, ...(copy[group] || [])];
+      return copy;
+    });
+
+    setDraftHtml("");
+    selectionRef.current = null;
+    if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
+  }
+
+  // =========================
+  // 우클릭 메뉴 위치: 커서 근처에 띄우기
+  // =========================
   function openGroupMenu(e, groupName) {
     e.preventDefault();
     e.stopPropagation();
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.min(rect.left, window.innerWidth - 260);
-    const y = Math.min(rect.bottom + 6, window.innerHeight - 380);
+    const MENU_W = 260;
+    const MENU_H = 380;
+    const pad = 8;
+
+    const x = Math.min(e.clientX + pad, window.innerWidth - MENU_W - pad);
+    const y = Math.min(e.clientY + pad, window.innerHeight - MENU_H - pad);
 
     setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
     setGroupMenu({ open: true, x, y, group: groupName });
   }
 
-  // 메모 우클릭 메뉴 열기
   function openMemoMenu(e, memoId) {
     e.preventDefault();
     e.stopPropagation();
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.min(rect.right - 240, window.innerWidth - 260);
-    const y = Math.min(rect.top + 18, window.innerHeight - 380);
+    const MENU_W = 260;
+    const MENU_H = 380;
+    const pad = 8;
+
+    const x = Math.min(e.clientX + pad, window.innerWidth - MENU_W - pad);
+    const y = Math.min(e.clientY + pad, window.innerHeight - MENU_H - pad);
 
     setGroupMenu({ open: false, x: 0, y: 0, group: null });
     setMemoMenu({ open: true, x, y, memoId });
   }
 
-  // 메모 찾기
   const memoById = useMemo(() => {
     const map = new Map();
     for (const m of currentMemos) map.set(m.id, m);
@@ -552,6 +627,9 @@ export default function MemoBoard({
 
   const memoMenuTarget = memoMenu.memoId ? memoById.get(memoMenu.memoId) : null;
 
+  // =========================
+  // UI
+  // =========================
   return (
     <aside className="glass p-5 flex flex-col h-full">
       {/* 상단 타이틀 */}
@@ -561,8 +639,7 @@ export default function MemoBoard({
         </div>
         <div className="text-right text-[11px] text-gray-400">
           <div>
-            현재 그룹:{" "}
-            <span className="font-medium text-gray-700">{activeGroup}</span>
+            현재 그룹: <span className="font-medium text-gray-700">{activeGroup}</span>
             {isGroupLocked && (
               <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
                 🔒 읽기전용
@@ -613,10 +690,7 @@ export default function MemoBoard({
               return (
                 <div
                   key={g}
-                  className={
-                    "group relative flex items-center " +
-                    (memoDragOverGroup === g ? "drop-shadow-md" : "")
-                  }
+                  className={"group relative flex items-center " + (memoDragOverGroup === g ? "drop-shadow-md" : "")}
                   onContextMenu={(e) => openGroupMenu(e, g)}
                   onDragOver={(e) => {
                     if (draggingMemoId) {
@@ -661,14 +735,9 @@ export default function MemoBoard({
                       onClick={() => setActiveGroup(g)}
                       className={
                         "px-3 py-1 text-xs rounded-t-md border border-gray-300 border-b-0 shadow-sm transition-all " +
-                        (active
-                          ? "font-semibold text-gray-900"
-                          : "text-gray-600 hover:-translate-y-[1px]")
+                        (active ? "font-semibold text-gray-900" : "text-gray-600 hover:-translate-y-[1px]")
                       }
-                      style={{
-                        backgroundColor: color,
-                        marginBottom: active ? 0 : 1,
-                      }}
+                      style={{ backgroundColor: color, marginBottom: active ? 0 : 1 }}
                       title="우클릭: 이동/링크복사/잠금/색/이름/삭제"
                     >
                       {g}
@@ -714,8 +783,7 @@ export default function MemoBoard({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-2 text-[11px] text-gray-500 border-b bg-gray-50">
-            그룹:{" "}
-            <span className="font-medium text-gray-800">{groupMenu.group}</span>
+            그룹: <span className="font-medium text-gray-800">{groupMenu.group}</span>
             {lockedGroups[groupMenu.group] && (
               <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
                 🔒 읽기전용
@@ -761,9 +829,7 @@ export default function MemoBoard({
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
           >
-            {lockedGroups[groupMenu.group]
-              ? "🔓 잠금 해제"
-              : "🔒 그룹 잠금(읽기전용)"}
+            {lockedGroups[groupMenu.group] ? "🔓 잠금 해제" : "🔒 그룹 잠금(읽기전용)"}
           </button>
 
           <button
@@ -843,7 +909,22 @@ export default function MemoBoard({
           </div>
 
           <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+            disabled={isGroupLocked}
+            className={
+              "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 " +
+              (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+            }
+            onClick={() => {
+              if (isGroupLocked) return;
+              loadMemoToDraft(memoMenuTarget);
+              setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
+            }}
+          >
+            ✏️ 편집(메인으로)
+          </button>
+
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t"
             onClick={() => {
               copyMemo(memoMenuTarget);
               setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
@@ -895,9 +976,7 @@ export default function MemoBoard({
           </div>
 
           <div className="px-3 py-2 border-t">
-            <div className="text-[11px] text-gray-500 mb-2">
-              다른 그룹으로 이동
-            </div>
+            <div className="text-[11px] text-gray-500 mb-2">다른 그룹으로 이동</div>
             <div className="flex flex-wrap gap-1">
               {groups
                 .filter((g) => g !== activeGroup)
@@ -934,21 +1013,27 @@ export default function MemoBoard({
         </div>
       )}
 
-      {/* 새 메모 입력 카드 (여기에만 풀 툴바) */}
+      {/* 새 메모 입력 카드 (서식 기능은 여기만) */}
       <div className="mb-4">
         <div className="rounded-2xl bg-gradient-to-br from-[#fef3c7]/80 via-white/95 to-white/95 border border-amber-100/80 shadow-[0_18px_40px_rgba(251,191,36,0.18)]">
           <div className="flex items-center justify-between px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_0_4px_rgba(250,250,249,1)]" />
               <span className="text-xs font-medium text-amber-900">
-                새 메모
+                {editingMemoId ? "메모 편집" : "새 메모"}
               </span>
               {isGroupLocked && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
                   🔒 읽기전용(추가/편집 불가)
                 </span>
               )}
+              {editingMemoId && !isGroupLocked && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/70 border border-amber-200 text-amber-800">
+                  ✏️ 수정 모드
+                </span>
+              )}
             </div>
+
             <button
               onClick={clearDraft}
               disabled={isGroupLocked}
@@ -963,7 +1048,7 @@ export default function MemoBoard({
             </button>
           </div>
 
-          {/* ✅ 메인 입력 툴바 (캡쳐처럼) */}
+          {/* 메인 입력 툴바 */}
           <div className="px-4 pb-2 border-t border-amber-100/80">
             <div
               className={
@@ -971,11 +1056,10 @@ export default function MemoBoard({
                 (isGroupLocked ? "opacity-50" : "")
               }
               onMouseDown={(e) => {
-                // 버튼 클릭 시 포커스 뺏기는 거 방지(드롭다운은 예외로 별도 처리)
+                // 버튼은 포커스 유지 / select는 preventDefault 하면 안 됨
                 if (e.target?.tagName !== "SELECT") e.preventDefault();
               }}
             >
-              {/* 폰트 */}
               <select
                 className="px-2 py-1 rounded bg-white/70 border"
                 defaultValue="Pretendard"
@@ -993,7 +1077,6 @@ export default function MemoBoard({
                 <option value="Times New Roman">Times</option>
               </select>
 
-              {/* 크기 */}
               <select
                 className="px-2 py-1 rounded bg-white/70 border"
                 defaultValue="3"
@@ -1124,7 +1207,6 @@ export default function MemoBoard({
                 🖼
               </button>
 
-              {/* 하이라이트 */}
               <select
                 className="px-2 py-1 rounded bg-white/70 border"
                 defaultValue=""
@@ -1160,13 +1242,11 @@ export default function MemoBoard({
                 서식지움
               </button>
 
-              <span className="ml-2 text-[10px] text-amber-600">
-                현재 그룹: {activeGroup}
-              </span>
+              <span className="ml-2 text-[10px] text-amber-600">현재 그룹: {activeGroup}</span>
             </div>
           </div>
 
-          {/* 메인 입력창 */}
+          {/* 메인 편집기 */}
           <div
             ref={draftEditorRef}
             className={
@@ -1183,18 +1263,25 @@ export default function MemoBoard({
 
           <div className="flex items-center justify-between px-4 pb-3">
             <button
-              onClick={addMemo}
+              onClick={upsertMemoFromDraft}
               disabled={isGroupLocked}
               className={
                 "px-3 py-1.5 rounded-full text-xs font-medium text-white shadow-md hover:shadow-lg transition-shadow " +
                 (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
               }
-              style={{
-                background: "linear-gradient(90deg,#f97316,#fbbf24)",
-              }}
+              style={{ background: "linear-gradient(90deg,#f97316,#fbbf24)" }}
             >
-              메모 추가
+              {editingMemoId ? "수정 저장" : "메모 추가"}
             </button>
+
+            {editingMemoId && !isGroupLocked && (
+              <button
+                onClick={clearDraft}
+                className="px-3 py-1.5 rounded-full text-xs font-medium border border-amber-200 bg-white/70 hover:bg-white"
+              >
+                편집 취소
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1208,8 +1295,7 @@ export default function MemoBoard({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
             {currentMemos.map((m) => {
-              const contentHtml =
-                m.html || (m.text ? plainToHtml(m.text) : "");
+              const contentHtml = m.html || (m.text ? plainToHtml(m.text) : "");
               const color = m.color || getRandomColor();
 
               return (
@@ -1243,14 +1329,29 @@ export default function MemoBoard({
                     </div>
 
                     <div className="flex gap-1 absolute top-1 right-1">
+                      {/* ✅ 메인 편집기로 불러오기 */}
                       <button
                         disabled={isGroupLocked}
                         onClick={(e) => {
                           e.stopPropagation();
                           if (isGroupLocked) return;
-                          setColorPickerFor((prev) =>
-                            prev === m.id ? null : m.id
-                          );
+                          loadMemoToDraft(m);
+                        }}
+                        className={
+                          "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px] " +
+                          (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+                        }
+                        title="메인 편집기에서 서식 편집"
+                      >
+                        ✏️
+                      </button>
+
+                      <button
+                        disabled={isGroupLocked}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isGroupLocked) return;
+                          setColorPickerFor((prev) => (prev === m.id ? null : m.id));
                         }}
                         className={
                           "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px] " +
@@ -1298,10 +1399,7 @@ export default function MemoBoard({
                               updateMemoColor(m.id, c);
                               setColorPickerFor(null);
                             }}
-                            className={
-                              "w-5 h-5 rounded-full border border-black/10 focus:outline-none" +
-                              (c === color ? " ring-2 ring-indigo-300" : "")
-                            }
+                            className="w-5 h-5 rounded-full border border-black/10 focus:outline-none"
                             style={{ backgroundColor: c }}
                           />
                         ))}
@@ -1309,21 +1407,15 @@ export default function MemoBoard({
                     )}
                   </div>
 
-                  {/* ✅ 저장된 메모는 심플 textarea만 */}
+                  {/* ✅ 저장된 메모: 서식(HTML) 그대로 표시 */}
                   <div className="px-3 pb-2">
-                    <textarea
+                    <div
                       className={
-                        "w-full text-[11px] leading-relaxed rounded-md px-2 py-2 max-h-40 min-h-[86px] resize-y " +
-                        "bg-white/30 outline-none " +
+                        "text-[11px] leading-relaxed rounded-md px-2 py-2 max-h-40 overflow-y-auto bg-white/30 " +
                         (isGroupLocked ? "opacity-70 cursor-not-allowed" : "")
                       }
-                      disabled={isGroupLocked}
-                      value={htmlToPlain(contentHtml)}
-                      onChange={(e) => {
-                        const text = e.target.value;
-                        updateMemoHtml(m.id, plainToHtml(text));
-                      }}
                       onContextMenu={(e) => openMemoMenu(e, m.id)}
+                      dangerouslySetInnerHTML={{ __html: contentHtml }}
                     />
                   </div>
 
@@ -1339,9 +1431,7 @@ export default function MemoBoard({
                         작성
                       </span>
                     )}
-                    <span className="text-[10px] text-gray-500">
-                      우클릭 메뉴 사용 가능
-                    </span>
+                    <span className="text-[10px] text-gray-500">우클릭 메뉴 사용 가능</span>
                   </div>
                 </motion.div>
               );
@@ -1353,12 +1443,12 @@ export default function MemoBoard({
   );
 }
 
-/** HTML -> plain (textarea에 넣기 좋게) */
+/** HTML -> plain (제목/검사용) */
 function htmlToPlain(html) {
   if (!html) return "";
   let s = html;
 
-  // 줄바꿈 태그들 처리
+  // 줄바꿈 태그들
   s = s.replace(/<br\s*\/?>/gi, "\n");
   s = s.replace(/<\/div>/gi, "\n");
   s = s.replace(/<\/p>/gi, "\n");
@@ -1374,7 +1464,7 @@ function htmlToPlain(html) {
   return s.trim();
 }
 
-/** plain -> html (기존 저장 구조 유지용) */
+/** plain -> html (fallback 용) */
 function plainToHtml(text) {
   const safe = (text || "")
     .replace(/&/g, "&amp;")
