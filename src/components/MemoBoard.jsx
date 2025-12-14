@@ -64,14 +64,13 @@ function getGroupColor(name) {
   return GROUP_TAB_COLORS[sum % GROUP_TAB_COLORS.length];
 }
 
-function ToolbarBtn({ disabled, onClick, onMouseDown, label, title, className = "" }) {
+function ToolbarBtn({ disabled, onMouseDown, label, title, className = "" }) {
   return (
     <button
       type="button"
       disabled={disabled}
-      onMouseDown={onMouseDown}
-      onClick={onClick}
       title={title}
+      onMouseDown={onMouseDown}
       className={
         "h-8 min-w-8 px-2 rounded-lg border text-[12px] transition " +
         (disabled
@@ -97,13 +96,15 @@ export default function MemoBoard({
   const [newGroup, setNewGroup] = useState("");
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
 
+  // 메인(새 메모) 편집기
   const [draftHtml, setDraftHtml] = useState("");
   const draftEditorRef = useRef(null);
 
+  // “수정” 모드 (편집 중인 메모)
   const [editingMemoId, setEditingMemoId] = useState(null);
   const [editingMemoGroup, setEditingMemoGroup] = useState(null);
 
-  // ✅ selection 저장소
+  // selection 저장
   const selectionRef = useRef(null);
 
   const [clipboardMemo, setClipboardMemo] = useState(null);
@@ -122,7 +123,7 @@ export default function MemoBoard({
   const [groupMenu, setGroupMenu] = useState({ open: false, x: 0, y: 0, group: null });
   const [memoMenu, setMemoMenu] = useState({ open: false, x: 0, y: 0, memoId: null });
 
-  // ✅ 드롭다운 메뉴
+  // 드롭다운
   const [highlightMenu, setHighlightMenu] = useState({ open: false, x: 0, y: 0 });
   const [textColorMenu, setTextColorMenu] = useState({ open: false, x: 0, y: 0 });
 
@@ -141,16 +142,23 @@ export default function MemoBoard({
   }
 
   // =========================
-  // ✅ selection 저장/복원 (핵심)
+  // ✅ selection 자동 저장 (툴바 클릭해도 유지)
   // =========================
-  function saveDraftSelection() {
-    const editor = draftEditorRef.current;
-    const sel = window.getSelection();
-    if (!editor || !sel || sel.rangeCount === 0) return;
+  useEffect(() => {
+    const handler = () => {
+      const editor = draftEditorRef.current;
+      const sel = window.getSelection();
+      if (!editor || !sel || sel.rangeCount === 0) return;
 
-    const range = sel.getRangeAt(0);
-    if (editor.contains(range.commonAncestorContainer)) selectionRef.current = range;
-  }
+      const range = sel.getRangeAt(0);
+      if (editor.contains(range.commonAncestorContainer)) {
+        selectionRef.current = range;
+      }
+    };
+
+    document.addEventListener("selectionchange", handler);
+    return () => document.removeEventListener("selectionchange", handler);
+  }, []);
 
   function focusEditorAndRestoreSelection() {
     const editor = draftEditorRef.current;
@@ -168,69 +176,79 @@ export default function MemoBoard({
     sel.addRange(range);
   }
 
-  // ✅ selectionchange로 계속 저장(툴바 눌러도 안 날아가게)
-  useEffect(() => {
-    const onSelChange = () => saveDraftSelection();
-    document.addEventListener("selectionchange", onSelChange);
-    return () => document.removeEventListener("selectionchange", onSelChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function applyDraftFormat(command, value) {
-    if (isGroupLocked) return;
-    focusEditorAndRestoreSelection();
-    try {
-      document.execCommand("styleWithCSS", false, true);
-    } catch {}
-    document.execCommand(command, false, value ?? null);
-    saveDraftSelection();
-    if (draftEditorRef.current) setDraftHtml(draftEditorRef.current.innerHTML);
-  }
-
-  // ✅ 폰트크기(px) 적용 (execCommand fontSize는 구리니까 span으로)
-  function applyFontSizePx(px) {
-    if (isGroupLocked) return;
-
-    focusEditorAndRestoreSelection();
+  function saveDraftSelection() {
     const editor = draftEditorRef.current;
     const sel = window.getSelection();
     if (!editor || !sel || sel.rangeCount === 0) return;
 
     const range = sel.getRangeAt(0);
+    if (editor.contains(range.commonAncestorContainer)) {
+      selectionRef.current = range;
+    }
+  }
+
+  function applyDraftFormat(command, value) {
+    if (isGroupLocked) return;
+
+    focusEditorAndRestoreSelection();
+    try {
+      document.execCommand("styleWithCSS", false, true);
+    } catch {}
+    document.execCommand(command, false, value ?? null);
+
+    // 업데이트
+    if (draftEditorRef.current) setDraftHtml(draftEditorRef.current.innerHTML);
+  }
+
+  // ✅ 선택 영역을 span으로 감싸서 px 크기 확실 적용
+  function wrapSelectionWithSpanStyle(styleObj) {
+    if (isGroupLocked) return;
+
+    const editor = draftEditorRef.current;
+    if (!editor) return;
+
+    focusEditorAndRestoreSelection();
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+
+    const range = sel.getRangeAt(0);
     if (!editor.contains(range.commonAncestorContainer)) return;
 
     const span = document.createElement("span");
-    span.style.fontSize = `${px}px`;
+    Object.assign(span.style, styleObj);
 
-    // 선택 내용이 없으면 앞으로 입력될 자리만 만들어줌
+    // 커서만 있는 경우: zero-width space로 자리 만들기
     if (range.collapsed) {
-      span.innerHTML = "\u200b";
+      span.appendChild(document.createTextNode("\u200B"));
       range.insertNode(span);
 
+      // 커서를 span 안쪽 끝으로
       const newRange = document.createRange();
-      newRange.setStart(span, 1);
+      newRange.setStart(span.firstChild, 1);
       newRange.collapse(true);
       sel.removeAllRanges();
       sel.addRange(newRange);
+      selectionRef.current = newRange;
+    } else {
+      const contents = range.extractContents();
+      span.appendChild(contents);
+      range.insertNode(span);
 
-      saveDraftSelection();
-      setDraftHtml(editor.innerHTML);
-      return;
+      // 커서를 span 뒤로
+      const newRange = document.createRange();
+      newRange.setStartAfter(span);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      selectionRef.current = newRange;
     }
 
-    const contents = range.extractContents();
-    span.appendChild(contents);
-    range.insertNode(span);
+    if (draftEditorRef.current) setDraftHtml(draftEditorRef.current.innerHTML);
+  }
 
-    // 커서를 span 뒤로
-    const newRange = document.createRange();
-    newRange.setStartAfter(span);
-    newRange.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-
-    saveDraftSelection();
-    setDraftHtml(editor.innerHTML);
+  function applyFontSizePx(px) {
+    wrapSelectionWithSpanStyle({ fontSize: `${px}px` });
   }
 
   function applyHighlight(color) {
@@ -241,15 +259,10 @@ export default function MemoBoard({
       document.execCommand("styleWithCSS", false, true);
     } catch {}
 
-    if (color === "CLEAR") {
-      document.execCommand("hiliteColor", false, "#ffffff");
-      document.execCommand("backColor", false, "#ffffff");
-    } else {
-      document.execCommand("hiliteColor", false, color);
-      document.execCommand("backColor", false, color);
-    }
+    const v = color === "CLEAR" ? "#ffffff" : color;
+    document.execCommand("hiliteColor", false, v);
+    document.execCommand("backColor", false, v);
 
-    saveDraftSelection();
     if (draftEditorRef.current) setDraftHtml(draftEditorRef.current.innerHTML);
   }
 
@@ -261,15 +274,16 @@ export default function MemoBoard({
       document.execCommand("styleWithCSS", false, true);
     } catch {}
 
-    document.execCommand("foreColor", false, color === "CLEAR" ? "#111827" : color);
+    const v = color === "CLEAR" ? "#111827" : color;
+    document.execCommand("foreColor", false, v);
 
-    saveDraftSelection();
     if (draftEditorRef.current) setDraftHtml(draftEditorRef.current.innerHTML);
   }
 
-  // ✅ 드롭다운 열기 (mousedown에서 열어야 안 닫힘)
+  // ✅ 버튼 기준으로 드롭다운 열기 (onMouseDown 전용)
   function openFloatingMenu(setter) {
     return (e) => {
+      if (isGroupLocked) return;
       e.preventDefault();
       e.stopPropagation();
       saveDraftSelection();
@@ -277,7 +291,7 @@ export default function MemoBoard({
       const rect = e.currentTarget.getBoundingClientRect();
       const pad = 8;
       const MENU_W = 260;
-      const MENU_H = 180;
+      const MENU_H = 220;
 
       const x = Math.min(rect.left, window.innerWidth - MENU_W - pad);
       const y = Math.min(rect.bottom + pad, window.innerHeight - MENU_H - pad);
@@ -337,7 +351,7 @@ export default function MemoBoard({
   }
 
   // =========================
-  // ✅ 메뉴 닫기 (mousedown)
+  // ✅ 바깥 클릭/스크롤 시 메뉴 닫기 (mousedown)
   // =========================
   useEffect(() => {
     const closeAll = () => {
@@ -357,10 +371,9 @@ export default function MemoBoard({
     };
   }, []);
 
-  // ✅ 편집 중에 그룹 바꾸면 자동 취소
+  // ✅ 편집 중 그룹 바꾸면 취소
   useEffect(() => {
-    if (!editingMemoId) return;
-    if (!editingMemoGroup) return;
+    if (!editingMemoId || !editingMemoGroup) return;
     if (activeGroup !== editingMemoGroup) {
       setEditingMemoId(null);
       setEditingMemoGroup(null);
@@ -389,15 +402,6 @@ export default function MemoBoard({
     setShowNewGroupInput(false);
   }
 
-  function clearDraft() {
-    if (isGroupLocked) return;
-    setDraftHtml("");
-    setEditingMemoId(null);
-    setEditingMemoGroup(null);
-    selectionRef.current = null;
-    if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
-  }
-
   function deleteGroup(name) {
     if (!name) return;
     const otherGroups = groups.filter((g) => g !== name);
@@ -421,7 +425,9 @@ export default function MemoBoard({
       const copy = { ...prev };
       const moving = copy[name] || [];
       delete copy[name];
-      if (moving.length > 0) copy[targetGroup] = [...moving, ...(copy[targetGroup] || [])];
+      if (moving.length > 0) {
+        copy[targetGroup] = [...moving, ...(copy[targetGroup] || [])];
+      }
       return copy;
     });
 
@@ -440,7 +446,10 @@ export default function MemoBoard({
     });
 
     if (activeGroup === name) setActiveGroup(targetGroup);
-    if (editingMemoGroup === name) clearDraft();
+
+    if (editingMemoGroup === name) {
+      clearDraft();
+    }
   }
 
   function startEditGroup(name) {
@@ -587,6 +596,17 @@ export default function MemoBoard({
     });
   }
 
+  function updateMemoHtml(id, html) {
+    const plain = htmlToPlain(html);
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
+        m.id === id ? { ...m, html, text: plain } : m
+      );
+      return copy;
+    });
+  }
+
   function updateMemoColor(id, color) {
     setMemos((prev) => {
       const copy = { ...prev };
@@ -619,8 +639,8 @@ export default function MemoBoard({
     setEditingMemoGroup(activeGroup);
 
     const html = memo.html || (memo.text ? plainToHtml(memo.text) : "");
-
     setDraftHtml(html);
+
     if (draftEditorRef.current) {
       draftEditorRef.current.innerHTML = html;
       draftEditorRef.current.focus();
@@ -631,6 +651,9 @@ export default function MemoBoard({
     }, 0);
   }
 
+  // =========================
+  // 클립보드
+  // =========================
   function copyMemo(memo) {
     setClipboardMemo({
       mode: "copy",
@@ -682,6 +705,18 @@ export default function MemoBoard({
     if (clipboardMemo.mode === "cut") setClipboardMemo(null);
   }
 
+  // =========================
+  // Draft 저장: 추가 / 수정 저장
+  // =========================
+  function clearDraft() {
+    if (isGroupLocked) return;
+    setDraftHtml("");
+    setEditingMemoId(null);
+    setEditingMemoGroup(null);
+    selectionRef.current = null;
+    if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
+  }
+
   function upsertMemoFromDraft() {
     if (isGroupLocked) return;
 
@@ -695,14 +730,23 @@ export default function MemoBoard({
     // 수정 저장
     if (editingMemoId && editingMemoGroup) {
       const targetGroup = editingMemoGroup;
+
       setMemos((prev) => {
         const copy = { ...prev };
         const list = copy[targetGroup] || [];
         copy[targetGroup] = list.map((m) =>
-          m.id === editingMemoId ? { ...m, html, text: plain, title: m.title || firstLine.slice(0, 30) } : m
+          m.id === editingMemoId
+            ? {
+                ...m,
+                html,
+                text: plain,
+                title: m.title || firstLine.slice(0, 30),
+              }
+            : m
         );
         return copy;
       });
+
       clearDraft();
       return;
     }
@@ -730,7 +774,7 @@ export default function MemoBoard({
   }
 
   // =========================
-  // 우클릭 메뉴 위치: 마우스 근처
+  // ✅ 우클릭 메뉴: 마우스 근처
   // =========================
   function openGroupMenu(e, groupName) {
     e.preventDefault();
@@ -776,9 +820,6 @@ export default function MemoBoard({
     return !!el;
   }
 
-  // =========================
-  // UI
-  // =========================
   return (
     <aside className="glass p-5 flex flex-col h-full">
       {/* 상단 타이틀 */}
@@ -808,13 +849,21 @@ export default function MemoBoard({
           </span>
           <div className="flex items-center gap-1">
             <button
-              onClick={pasteClipboardToActiveGroup}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                pasteClipboardToActiveGroup();
+              }}
               className="px-2 py-1 rounded-full border border-amber-300 bg-white/70 hover:bg-white text-[11px] font-medium"
             >
               붙여넣기
             </button>
             <button
-              onClick={() => setClipboardMemo(null)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setClipboardMemo(null);
+              }}
               className="px-2 py-1 rounded-full text-[11px] text-amber-500 hover:bg-amber-100/60"
             >
               지우기
@@ -827,6 +876,7 @@ export default function MemoBoard({
       <div className="mb-4">
         <div className="relative">
           <div className="h-7 bg-white/90 rounded-t-md border border-gray-200 border-b-0" />
+
           <div className="absolute left-2 top-0 flex items-end gap-1 pr-14">
             {groups.map((g) => {
               const active = g === activeGroup;
@@ -877,7 +927,11 @@ export default function MemoBoard({
                     />
                   ) : (
                     <button
-                      onClick={() => setActiveGroup(g)}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setActiveGroup(g);
+                      }}
                       className={
                         "px-3 py-1 text-xs rounded-t-md border border-gray-300 border-b-0 shadow-sm transition-all " +
                         (active ? "font-semibold text-gray-900" : "text-gray-600 hover:-translate-y-[1px]")
@@ -894,7 +948,11 @@ export default function MemoBoard({
             })}
 
             <button
-              onClick={() => setShowNewGroupInput((v) => !v)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowNewGroupInput((v) => !v);
+              }}
               className="ml-1 px-3 py-1 text-xs rounded-t-md border border-dashed border-gray-300 border-b-0 bg-gray-50 hover:bg-white hover:-translate-y-[1px] transition-all"
             >
               +
@@ -909,7 +967,14 @@ export default function MemoBoard({
                 placeholder="새 그룹 이름"
                 className="px-2 py-1 text-xs rounded-md border border-gray-300 flex-1 bg-white/90 outline-none focus:ring-1 focus:ring-indigo-300"
               />
-              <button onClick={createGroup} className="px-2 py-1 text-xs rounded-md bg-indigo-500 text-white hover:bg-indigo-600">
+              <button
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  createGroup();
+                }}
+                className="px-2 py-1 text-xs rounded-md bg-indigo-500 text-white hover:bg-indigo-600"
+              >
                 추가
               </button>
             </div>
@@ -927,14 +992,18 @@ export default function MemoBoard({
           <div className="px-3 py-2 text-[11px] text-gray-500 border-b bg-gray-50">
             그룹: <span className="font-medium text-gray-800">{groupMenu.group}</span>
             {lockedGroups[groupMenu.group] && (
-              <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">🔒 읽기전용</span>
+              <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                🔒 읽기전용
+              </span>
             )}
           </div>
 
           <div className="px-2 py-2 flex gap-2">
             <button
               className="flex-1 px-2 py-2 rounded-lg border hover:bg-gray-50 text-sm"
-              onClick={() => {
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 moveGroup(groupMenu.group, "up");
                 setGroupMenu({ open: false, x: 0, y: 0, group: null });
               }}
@@ -943,7 +1012,9 @@ export default function MemoBoard({
             </button>
             <button
               className="flex-1 px-2 py-2 rounded-lg border hover:bg-gray-50 text-sm"
-              onClick={() => {
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 moveGroup(groupMenu.group, "down");
                 setGroupMenu({ open: false, x: 0, y: 0, group: null });
               }}
@@ -954,7 +1025,9 @@ export default function MemoBoard({
 
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t"
-            onClick={() => {
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               copySectionLink(groupMenu.group);
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
@@ -964,7 +1037,9 @@ export default function MemoBoard({
 
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-            onClick={() => {
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               toggleGroupLock(groupMenu.group);
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
@@ -974,7 +1049,9 @@ export default function MemoBoard({
 
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t"
-            onClick={() => {
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               startEditGroup(groupMenu.group);
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
@@ -984,7 +1061,9 @@ export default function MemoBoard({
 
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-            onClick={() => {
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               duplicateGroup(groupMenu.group);
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
@@ -1000,7 +1079,9 @@ export default function MemoBoard({
                   key={c}
                   className="w-5 h-5 rounded-full border border-black/10"
                   style={{ backgroundColor: c }}
-                  onClick={() => {
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setGroupColor(groupMenu.group, c);
                     setGroupMenu({ open: false, x: 0, y: 0, group: null });
                   }}
@@ -1008,7 +1089,9 @@ export default function MemoBoard({
               ))}
               <button
                 className="ml-auto text-[11px] px-2 py-1 rounded-md border hover:bg-gray-50"
-                onClick={() => {
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   setGroupColorOverrides((prev) => {
                     const next = { ...prev };
                     delete next[groupMenu.group];
@@ -1024,7 +1107,9 @@ export default function MemoBoard({
 
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-red-50 text-red-600 border-t"
-            onClick={() => {
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               deleteGroup(groupMenu.group);
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
@@ -1047,8 +1132,13 @@ export default function MemoBoard({
 
           <button
             disabled={isGroupLocked}
-            className={"w-full text-left px-3 py-2 text-sm hover:bg-gray-50 " + (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")}
-            onClick={() => {
+            className={
+              "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 " +
+              (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+            }
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               if (isGroupLocked) return;
               loadMemoToDraft(memoMenuTarget);
               setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
@@ -1059,7 +1149,9 @@ export default function MemoBoard({
 
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t"
-            onClick={() => {
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               copyMemo(memoMenuTarget);
               setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
             }}
@@ -1069,8 +1161,13 @@ export default function MemoBoard({
 
           <button
             disabled={isGroupLocked}
-            className={"w-full text-left px-3 py-2 text-sm hover:bg-gray-50 " + (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")}
-            onClick={() => {
+            className={
+              "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 " +
+              (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+            }
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               if (isGroupLocked) return;
               cutMemo(memoMenuTarget);
               setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
@@ -1081,7 +1178,9 @@ export default function MemoBoard({
 
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-            onClick={() => {
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               pasteClipboardToActiveGroup();
               setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
             }}
@@ -1097,7 +1196,9 @@ export default function MemoBoard({
                   key={c}
                   className="w-5 h-5 rounded-full border border-black/10"
                   style={{ backgroundColor: c }}
-                  onClick={() => {
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     updateMemoColor(memoMenuTarget.id, c);
                     setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
                   }}
@@ -1116,7 +1217,9 @@ export default function MemoBoard({
                   <button
                     key={g}
                     className="px-2 py-1 rounded-md border text-[11px] hover:bg-gray-50"
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       moveMemoToGroup(memoMenuTarget.id, g);
                       setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
                     }}
@@ -1133,7 +1236,9 @@ export default function MemoBoard({
               "w-full text-left px-3 py-2 text-sm hover:bg-red-50 text-red-600 border-t " +
               (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
             }
-            onClick={() => {
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               if (isGroupLocked) return;
               removeMemo(memoMenuTarget.id);
               setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
@@ -1147,11 +1252,14 @@ export default function MemoBoard({
       {/* 새 메모 입력 카드 */}
       <div className="mb-4">
         <div className="rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.08)] overflow-hidden">
+          {/* 헤더 */}
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-2.5 w-2.5 rounded-full bg-indigo-400" />
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-gray-900">{editingMemoId ? "메모 편집" : "새 메모"}</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {editingMemoId ? "메모 편집" : "새 메모"}
+                </span>
                 <span className="text-[11px] text-gray-500">
                   {editingMemoId ? "서식 포함 수정 후 저장" : "서식 포함 메모를 빠르게 작성"}
                 </span>
@@ -1171,13 +1279,17 @@ export default function MemoBoard({
           </div>
 
           {/* 툴바 */}
-          <div
-            className={"px-5 pb-3 " + (isGroupLocked ? "opacity-50" : "")}
-            onMouseDown={(e) => {
-              if (e.target?.tagName !== "SELECT" && e.target?.tagName !== "BUTTON") e.preventDefault();
-            }}
-          >
-            <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto whitespace-nowrap rounded-xl border border-gray-200 bg-white/80 px-2 py-2">
+          <div className={"px-5 pb-3 " + (isGroupLocked ? "opacity-50" : "")}>
+            <div
+              className="flex flex-nowrap items-center gap-1.5 overflow-x-auto whitespace-nowrap rounded-xl border border-gray-200 bg-white/80 px-2 py-2"
+              onMouseDown={(e) => {
+                // contentEditable 포커스/selection 유지용
+                // (select/button은 기본 동작 허용)
+                if (e.target?.tagName !== "SELECT" && e.target?.tagName !== "BUTTON") {
+                  e.preventDefault();
+                }
+              }}
+            >
               {/* 폰트 */}
               <select
                 className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-[12px]"
@@ -1196,7 +1308,7 @@ export default function MemoBoard({
                 ))}
               </select>
 
-              {/* 크기(px) */}
+              {/* 크기 px */}
               <select
                 className="h-8 px-2 rounded-lg border border-gray-200 bg-white text-[12px]"
                 defaultValue="16"
@@ -1220,57 +1332,133 @@ export default function MemoBoard({
               <ToolbarBtn
                 disabled={isGroupLocked}
                 label="B"
+                title="굵게"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  saveDraftSelection();
+                  applyDraftFormat("bold");
                 }}
-                onClick={() => applyDraftFormat("bold")}
               />
               <ToolbarBtn
                 disabled={isGroupLocked}
                 label="I"
+                title="기울임"
                 className="italic"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  saveDraftSelection();
+                  applyDraftFormat("italic");
                 }}
-                onClick={() => applyDraftFormat("italic")}
               />
               <ToolbarBtn
                 disabled={isGroupLocked}
                 label="U"
+                title="밑줄"
                 className="underline"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  saveDraftSelection();
+                  applyDraftFormat("underline");
                 }}
-                onClick={() => applyDraftFormat("underline")}
               />
 
               <div className="mx-1 h-6 w-px bg-gray-200" />
 
-              <ToolbarBtn disabled={isGroupLocked} label="⟸" onClick={() => applyDraftFormat("justifyLeft")} />
-              <ToolbarBtn disabled={isGroupLocked} label="≡" onClick={() => applyDraftFormat("justifyCenter")} />
-              <ToolbarBtn disabled={isGroupLocked} label="⟹" onClick={() => applyDraftFormat("justifyRight")} />
+              {/* 정렬 */}
+              <ToolbarBtn
+                disabled={isGroupLocked}
+                label="⟸"
+                title="왼쪽정렬"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  applyDraftFormat("justifyLeft");
+                }}
+              />
+              <ToolbarBtn
+                disabled={isGroupLocked}
+                label="≡"
+                title="가운데정렬"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  applyDraftFormat("justifyCenter");
+                }}
+              />
+              <ToolbarBtn
+                disabled={isGroupLocked}
+                label="⟹"
+                title="오른쪽정렬"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  applyDraftFormat("justifyRight");
+                }}
+              />
 
               <div className="mx-1 h-6 w-px bg-gray-200" />
 
-              <ToolbarBtn disabled={isGroupLocked} label="☑︎" title="체크박스" onClick={insertCheckboxListToDraft} />
-              <ToolbarBtn disabled={isGroupLocked} label="▦" title="표" onClick={insertTableToDraft} />
+              {/* 체크/표 */}
+              <ToolbarBtn
+                disabled={isGroupLocked}
+                label="☑︎"
+                title="체크박스"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  insertCheckboxListToDraft();
+                }}
+              />
+              <ToolbarBtn
+                disabled={isGroupLocked}
+                label="▦"
+                title="표"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  insertTableToDraft();
+                }}
+              />
 
               <div className="mx-1 h-6 w-px bg-gray-200" />
 
-              <ToolbarBtn disabled={isGroupLocked} label="🔗" title="링크" onClick={handleInsertLinkToDraft} />
-              <ToolbarBtn disabled={isGroupLocked} label="🖼" title="이미지" onClick={handleInsertImageToDraft} />
+              {/* 링크/이미지 */}
+              <ToolbarBtn
+                disabled={isGroupLocked}
+                label="🔗"
+                title="링크"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleInsertLinkToDraft();
+                }}
+              />
+              <ToolbarBtn
+                disabled={isGroupLocked}
+                label="🖼"
+                title="이미지"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleInsertImageToDraft();
+                }}
+              />
 
               <div className="mx-1 h-6 w-px bg-gray-200" />
 
-              {/* 글자색/하이라이트 (mousedown으로 열기) */}
-              <ToolbarBtn disabled={isGroupLocked} label="A" title="글자색" onMouseDown={openFloatingMenu(setTextColorMenu)} />
-              <ToolbarBtn disabled={isGroupLocked} label="🖍" title="하이라이트" onMouseDown={openFloatingMenu(setHighlightMenu)} />
+              {/* 글자색/하이라이트 (드롭다운) */}
+              <ToolbarBtn
+                disabled={isGroupLocked}
+                label="A"
+                title="글자색"
+                onMouseDown={openFloatingMenu(setTextColorMenu)}
+              />
+              <ToolbarBtn
+                disabled={isGroupLocked}
+                label="🖍"
+                title="하이라이트"
+                onMouseDown={openFloatingMenu(setHighlightMenu)}
+              />
             </div>
 
             <div className="mt-2 text-[11px] text-gray-500">
@@ -1295,14 +1483,14 @@ export default function MemoBoard({
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      saveDraftSelection();
-                    }}
-                    onClick={() => {
                       applyTextColor(c.clear ? "CLEAR" : c.v);
                       setTextColorMenu({ open: false, x: 0, y: 0 });
                     }}
                   >
-                    <span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: c.clear ? "#fff" : c.v }} />
+                    <span
+                      className="h-4 w-4 rounded-full border border-black/10"
+                      style={{ backgroundColor: c.clear ? "#ffffff" : c.v }}
+                    />
                     <span className="text-gray-700">{c.name}</span>
                   </button>
                 ))}
@@ -1327,14 +1515,14 @@ export default function MemoBoard({
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      saveDraftSelection();
-                    }}
-                    onClick={() => {
                       applyHighlight(c.clear ? "CLEAR" : c.v);
                       setHighlightMenu({ open: false, x: 0, y: 0 });
                     }}
                   >
-                    <span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: c.clear ? "#fff" : c.v }} />
+                    <span
+                      className="h-4 w-4 rounded-full border border-black/10"
+                      style={{ backgroundColor: c.clear ? "#ffffff" : c.v }}
+                    />
                     <span className="text-gray-700">{c.name}</span>
                   </button>
                 ))}
@@ -1360,17 +1548,26 @@ export default function MemoBoard({
               onFocus={saveDraftSelection}
             />
 
+            {/* 액션 */}
             <div className="mt-4 flex items-center justify-end gap-2">
               {editingMemoId && !isGroupLocked && (
                 <button
-                  onClick={clearDraft}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearDraft();
+                  }}
                   className="h-10 px-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium"
                 >
                   취소
                 </button>
               )}
               <button
-                onClick={upsertMemoFromDraft}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  upsertMemoFromDraft();
+                }}
                 disabled={isGroupLocked}
                 className={
                   "h-10 px-5 rounded-xl text-sm font-semibold text-white shadow-sm transition " +
@@ -1443,11 +1640,12 @@ export default function MemoBoard({
                       />
                     </div>
 
-                    {/* ✅ 네가 원한대로: 카드 상단 버튼 최소화(수정/삭제/복사/색상) */}
+                    {/* ✅ 상단 버튼은 “수정 / 삭제”만 남김 (복사 삭제 완료) */}
                     <div className="flex gap-1 absolute top-1 right-1">
                       <button
                         disabled={isGroupLocked}
-                        onClick={(e) => {
+                        onMouseDown={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           if (isGroupLocked) return;
                           loadMemoToDraft(m);
@@ -1456,25 +1654,15 @@ export default function MemoBoard({
                           "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px] " +
                           (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
                         }
-                        title="수정"
+                        title="메인 편집기에서 편집"
                       >
                         ✏️
                       </button>
 
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyMemo(m);
-                        }}
-                        className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
-                        title="복사"
-                      >
-                        📄
-                      </button>
-
-                      <button
                         disabled={isGroupLocked}
-                        onClick={(e) => {
+                        onMouseDown={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           if (isGroupLocked) return;
                           removeMemo(m.id);
@@ -1487,9 +1675,15 @@ export default function MemoBoard({
                       >
                         ×
                       </button>
+
+                      {/* (색상 변경은 우클릭 메뉴로만) */}
                     </div>
+
+                    {/* (혹시 이전 코드 잔재로 뜨는 팔레트가 있으면 완전 제거) */}
+                    {false && colorPickerFor === m.id && null}
                   </div>
 
+                  {/* 저장된 메모: 서식 그대로 표시 */}
                   <div className="px-3 pb-2">
                     <div
                       className={
@@ -1525,7 +1719,7 @@ export default function MemoBoard({
   );
 }
 
-/** HTML -> plain */
+/** HTML -> plain (제목/검사용) */
 function htmlToPlain(html) {
   if (!html) return "";
   let s = html;
@@ -1543,11 +1737,8 @@ function htmlToPlain(html) {
   return s.trim();
 }
 
-/** plain -> html */
+/** plain -> html (fallback 용) */
 function plainToHtml(text) {
-  const safe = (text || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  const safe = (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return safe.replace(/\n/g, "<br/>");
 }
