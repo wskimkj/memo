@@ -1,152 +1,168 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 
-/**
- * TodoBoard.jsx
- * - 목록: 2줄 말줄임 + 진한 텍스트
- * - 클릭 시: 모달에서 전체 텍스트 읽기/수정
- * - 기존 todos 구조: { id, text, done, date }
- */
+export default function TodoCard() {
+  const [items, setItems] = useState([
+    { id: 1, text: "편집", done: true, starred: false },
+    { id: 2, text: "예시: 환영합니다!", done: true, starred: false },
+  ]);
+  const [value, setValue] = useState("");
 
-export default function TodoBoard({ todos, setTodos }) {
-  const [newText, setNewText] = useState("");
-  const [openTodo, setOpenTodo] = useState(null);
-  const [editText, setEditText] = useState("");
+  const doneCount = useMemo(() => items.filter(i => i.done).length, [items]);
+  const totalCount = items.length;
 
-  const addTodo = () => {
-    const text = newText.trim();
-    if (!text) return;
-
-    setTodos((prev) => [
-      {
-        id: Date.now().toString(),
-        text,
-        done: false,
-        date: null,
-      },
-      ...prev,
-    ]);
-    setNewText("");
+  const addItem = () => {
+    const t = value.trim();
+    if (!t) return;
+    setItems(prev => [{ id: Date.now(), text: t, done: false, starred: false }, ...prev]);
+    setValue("");
   };
 
-  const toggleDone = (id) => {
-    setTodos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
-  };
+  const toggleDone = (id) =>
+    setItems(prev => prev.map(i => (i.id === id ? { ...i, done: !i.done } : i)));
 
-  const saveEdit = () => {
-    setTodos((prev) =>
-      prev.map((t) =>
-        t.id === openTodo.id ? { ...t, text: editText } : t
-      )
-    );
-    setOpenTodo(null);
-  };
+  const toggleStar = (id) =>
+    setItems(prev => prev.map(i => (i.id === id ? { ...i, starred: !i.starred } : i)));
+
+  const remove = (id) => setItems(prev => prev.filter(i => i.id !== id));
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* 추가 */}
-      <div className="flex gap-2">
-        <input
-          className="flex-1 rounded-2xl px-4 py-3 bg-white/70 border border-slate-900/10 outline-none text-slate-900 placeholder:text-slate-500"
-          value={newText}
-          onChange={(e) => setNewText(e.target.value)}
-          placeholder="+ 할 일 추가 (Enter)"
-          onKeyDown={(e) => e.key === "Enter" && addTodo()}
-        />
-        <button
-          className="rounded-2xl px-4 py-3 bg-indigo-500/15 border border-indigo-500/20 text-slate-900 font-semibold"
-          onClick={addTodo}
-        >
-          추가
-        </button>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 p-10">
+      {/* soft outer glow */}
+      <div className="relative">
+        <div className="absolute -inset-10 rounded-[40px] bg-gradient-to-br from-indigo-200/60 via-purple-200/50 to-pink-200/60 blur-2xl" />
+        <div className="relative w-[360px] rounded-[36px] bg-white/60 backdrop-blur-xl shadow-[0_30px_80px_rgba(15,23,42,0.18)] ring-1 ring-white/60 p-7">
+          {/* inner card */}
+          <div className="rounded-[28px] bg-gradient-to-br from-indigo-200/55 via-purple-200/55 to-pink-200/55 shadow-[0_18px_40px_rgba(15,23,42,0.12)] ring-1 ring-white/50 p-6">
+            {/* top bar */}
+            <div className="flex items-center justify-between text-white/90">
+              <button className="h-9 w-9 rounded-full bg-white/20 hover:bg-white/25 ring-1 ring-white/25 grid place-items-center transition">
+                <span className="block w-4 h-0.5 bg-white/90 rounded" />
+                <span className="block w-4 h-0.5 bg-white/90 rounded mt-1" />
+                <span className="block w-4 h-0.5 bg-white/90 rounded mt-1" />
+              </button>
 
-      {/* 목록 */}
-      <div className="rounded-3xl bg-white/55 border border-slate-900/10 overflow-hidden">
-        {todos.length === 0 ? (
-          <div className="px-4 py-6 text-slate-500 text-sm">
-            할 일이 없어요.
-          </div>
-        ) : (
-          todos.map((todo) => (
-            <button
-              key={todo.id}
-              onClick={() => {
-                setOpenTodo(todo);
-                setEditText(todo.text);
-              }}
-              className="w-full text-left px-4 py-3 flex items-start gap-3 border-b border-slate-900/5 hover:bg-slate-900/5"
-            >
-              {/* 체크 */}
-              <span
-                className="shrink-0 w-9 h-9 rounded-xl border border-slate-900/10 bg-white/70 grid place-items-center"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleDone(todo.id);
-                }}
-              >
-                {todo.done ? "✅" : "⭕"}
-              </span>
-
-              {/* 텍스트 */}
-              <div className="flex-1 min-w-0">
-                <div
-                  className={[
-                    "text-slate-900 font-semibold leading-snug line-clamp-2",
-                    todo.done ? "line-through opacity-60" : "",
-                  ].join(" ")}
-                  title={todo.text}
-                >
-                  {todo.text}
-                </div>
+              <div className="text-sm font-semibold tracking-wide drop-shadow-sm">
+                To Do List
               </div>
-            </button>
-          ))
-        )}
-      </div>
 
-      {/* ✅ 전체 보기 / 수정 모달 */}
-      {openTodo && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white/90 backdrop-blur border border-slate-900/10 shadow-xl">
-            <div className="px-5 py-4 border-b border-slate-900/10 flex justify-between items-center">
-              <div className="font-bold text-slate-900">
-                할 일 보기 / 수정
-              </div>
-              <button
-                className="rounded-xl px-3 py-2 bg-slate-900/5 border border-slate-900/10"
-                onClick={() => setOpenTodo(null)}
-              >
-                닫기
+              <button className="h-9 w-9 rounded-full bg-white/20 hover:bg-white/25 ring-1 ring-white/25 grid place-items-center transition">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M21 21l-4.3-4.3m1.3-5.2a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
             </div>
 
-            <div className="p-5">
-              <textarea
-                className="w-full min-h-[160px] rounded-2xl px-4 py-3 bg-white border border-slate-900/10 outline-none text-slate-900"
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-              />
+            {/* title + page */}
+            <div className="mt-5 flex items-center justify-between">
+              <div className="text-white font-extrabold text-xl drop-shadow-sm">
+                오늘 할 일
+              </div>
 
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  className="rounded-2xl px-4 py-2 bg-slate-900/5 border border-slate-900/10"
-                  onClick={() => setOpenTodo(null)}
-                >
-                  취소
-                </button>
-                <button
-                  className="rounded-2xl px-4 py-2 bg-indigo-500/15 border border-indigo-500/20 font-semibold"
-                  onClick={saveEdit}
-                >
-                  저장
-                </button>
+              <div className="px-3 py-1 rounded-full bg-white/20 ring-1 ring-white/25 text-white/90 text-xs font-semibold">
+                {Math.min(doneCount, 2)}/{Math.max(2, totalCount || 2)}
               </div>
             </div>
+
+            {/* input pill */}
+            <div className="mt-4 flex items-center gap-3 rounded-full bg-white/20 ring-1 ring-white/30 px-4 py-3">
+              <button
+                onClick={addItem}
+                className="h-9 w-9 rounded-full bg-white/30 hover:bg-white/35 ring-1 ring-white/35 grid place-items-center transition"
+                aria-label="add"
+              >
+                <span className="text-white text-xl leading-none">+</span>
+              </button>
+
+              <input
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addItem()}
+                placeholder="Add a task..."
+                className="flex-1 bg-transparent placeholder:text-white/70 text-white outline-none text-sm"
+              />
+            </div>
+
+            {/* list */}
+            <div className="mt-5 space-y-3">
+              {items.slice(0, 2).map((it) => (
+                <div
+                  key={it.id}
+                  className="flex items-center gap-3 rounded-2xl bg-white/70 ring-1 ring-white/70 px-4 py-3 shadow-[0_10px_18px_rgba(15,23,42,0.08)]"
+                >
+                  <button
+                    onClick={() => toggleDone(it.id)}
+                    className="h-9 w-9 rounded-full bg-indigo-500/90 hover:bg-indigo-500 text-white grid place-items-center shadow-[0_10px_18px_rgba(99,102,241,0.35)] transition"
+                    aria-label="toggle done"
+                  >
+                    {it.done ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M20 6L9 17l-5-5"
+                          stroke="white"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : null}
+                  </button>
+
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={[
+                        "text-sm font-semibold text-slate-700 truncate",
+                        it.done ? "line-through opacity-70" : "",
+                      ].join(" ")}
+                    >
+                      {it.text}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => toggleStar(it.id)}
+                    className="h-9 w-9 rounded-full hover:bg-slate-100/70 grid place-items-center transition"
+                    aria-label="star"
+                    title="star"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill={it.starred ? "#111827" : "none"}>
+                      <path
+                        d="M12 17.3l-6.2 3.6 1.6-7.1L1.9 9l7.3-.6L12 1.8l2.8 6.6 7.3.6-5.5 4.8 1.6 7.1z"
+                        stroke="#111827"
+                        strokeWidth="1.8"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() => remove(it.id)}
+                    className="h-9 w-9 rounded-full hover:bg-slate-100/70 grid place-items-center transition"
+                    aria-label="remove"
+                    title="remove"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M18 6L6 18M6 6l12 12"
+                        stroke="#111827"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* subtle bottom tint like your mock */}
+            <div className="mt-4 h-10 rounded-2xl bg-gradient-to-r from-pink-200/60 to-purple-200/40" />
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
