@@ -167,9 +167,6 @@ export default function TodoBoard({ todos, setTodos }) {
           {/* 제목 + 진행률 (아주 작게) */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold tracking-tight text-[#2F2F2F]">
-                오늘 할 일
-              </h2>
               <p className="text-[10px] opacity-70 text-[#3A3A3A]"></p>
             </div>
             <div className="flex flex-col items-end gap-1">
