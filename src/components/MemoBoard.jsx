@@ -1485,65 +1485,41 @@ export default function MemoBoard({
                     </div>
 
                     <div className="flex gap-1 absolute top-1 right-1">
-                      <button
-                        disabled={isGroupLocked}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isGroupLocked) return;
-                          loadMemoToDraft(m);
-                        }}
-                        className={
-                          "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px] " +
-                          (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
-                        }
-                        title="메인 편집기에서 서식 편집"
-                      >
-                        ✏️
-                      </button>
+  {/* 수정 */}
+  <button
+    disabled={isGroupLocked}
+    onClick={(e) => {
+      e.stopPropagation();
+      if (isGroupLocked) return;
+      loadMemoToDraft(m);
+    }}
+    className={
+      "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px] " +
+      (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+    }
+    title="편집"
+  >
+    ✏️
+  </button>
 
-                      <button
-                        disabled={isGroupLocked}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isGroupLocked) return;
-                          setColorPickerFor((prev) => (prev === m.id ? null : m.id));
-                        }}
-                        className={
-                          "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px] " +
-                          (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
-                        }
-                        title="색상 변경"
-                      >
-                        🎨
-                      </button>
+  {/* 삭제 */}
+  <button
+    disabled={isGroupLocked}
+    onClick={(e) => {
+      e.stopPropagation();
+      if (isGroupLocked) return;
+      removeMemo(m.id);
+    }}
+    className={
+      "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white " +
+      (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+    }
+    title="삭제"
+  >
+    ×
+  </button>
+</div>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyMemo(m);
-                        }}
-                        className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
-                        title="복사"
-                      >
-                        📄
-                      </button>
-
-                      <button
-                        disabled={isGroupLocked}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isGroupLocked) return;
-                          removeMemo(m.id);
-                        }}
-                        className={
-                          "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white " +
-                          (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
-                        }
-                        title="삭제"
-                      >
-                        ×
-                      </button>
-                    </div>
 
                     {colorPickerFor === m.id && (
                       <div
