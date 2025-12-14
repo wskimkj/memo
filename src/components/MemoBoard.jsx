@@ -991,7 +991,7 @@ export default function MemoBoard({
                 setGroupMenu({ open: false, x: 0, y: 0, group: null });
               }}
             >
-              ⬅/⬆ 위로
+              ⬆ 
             </button>
             <button
               className="flex-1 px-2 py-2 rounded-lg border hover:bg-gray-50 text-sm"
@@ -1002,7 +1002,7 @@ export default function MemoBoard({
                 setGroupMenu({ open: false, x: 0, y: 0, group: null });
               }}
             >
-              ➡/⬇ 아래로
+              ⬇ 
             </button>
           </div>
 
@@ -1015,7 +1015,7 @@ export default function MemoBoard({
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
           >
-            🔗 섹션 링크 복사
+            🔗 링크 복사
           </button>
 
           <button
@@ -1027,7 +1027,7 @@ export default function MemoBoard({
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
           >
-            {lockedGroups[groupMenu.group] ? "🔓 잠금 해제" : "🔒 그룹 잠금(읽기전용)"}
+            {lockedGroups[groupMenu.group] ? "🔓 잠금 해제" : "🔒 그룹 잠금"}
           </button>
 
           <button
@@ -1039,7 +1039,7 @@ export default function MemoBoard({
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
           >
-            ✏️ 이름 바꾸기
+            ✏️ 편집
           </button>
 
           <button
@@ -1051,7 +1051,7 @@ export default function MemoBoard({
               setGroupMenu({ open: false, x: 0, y: 0, group: null });
             }}
           >
-            📄 그룹 복사(복제)
+            📄 복사
           </button>
 
           <div className="px-3 py-2 border-t">
@@ -1569,7 +1569,7 @@ export default function MemoBoard({
       <div className="flex-1 flex flex-col">
         {currentMemos.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-xs text-gray-400 text-center px-4">
-            아직 메모가 없어요.
+            메모가 없어요.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
