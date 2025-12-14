@@ -1524,7 +1524,7 @@ export default function MemoBoard({
                   : "border-gray-200 focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-100")
               }
               contentEditable={!isGroupLocked}
-              data-placeholder="자유롭게 적어보세요…"
+              data-placeholder="작성 중…"
               onInput={(e) => setDraftHtml(e.currentTarget.innerHTML)}
               onMouseUp={saveDraftSelection}
               onKeyUp={saveDraftSelection}
@@ -1558,7 +1558,7 @@ export default function MemoBoard({
                 }
                 style={{ background: "linear-gradient(90deg,#6366F1,#22C55E)" }}
               >
-                {editingMemoId ? "수정 저장" : "메모 추가"}
+                {editingMemoId ? "Done" : "Save"}
               </button>
             </div>
           </div>
