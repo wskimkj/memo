@@ -824,9 +824,6 @@ export default function MemoBoard({
     <aside className="glass p-5 flex flex-col h-full">
       {/* 상단 타이틀 */}
       <div className="flex items-center justify-between mb-3">
-        <div>
-          <h2 className="text-sm font-semibold text-gray-800">메모 보드</h2>
-        </div>
         <div className="text-right text-[11px] text-gray-400">
           <div>
             현재 그룹: <span className="font-medium text-gray-700">{activeGroup}</span>
@@ -1261,7 +1258,7 @@ export default function MemoBoard({
                   {editingMemoId ? "메모 편집" : "새 메모"}
                 </span>
                 <span className="text-[11px] text-gray-500">
-                  {editingMemoId ? "서식 포함 수정 후 저장" : "서식 포함 메모를 빠르게 작성"}
+                  {editingMemoId ? "서식 포함 수정 후 저장" : ""}
                 </span>
               </div>
 
