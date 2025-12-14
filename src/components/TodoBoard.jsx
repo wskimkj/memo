@@ -170,7 +170,7 @@ export default function TodoBoard({ todos, setTodos }) {
               <h2 className="text-sm font-semibold tracking-tight text-[#2F2F2F]">
                 오늘 할 일
               </h2>
-              <p className="text-[10px] opacity-70 text-[#3A3A3A]""></p>
+              <p className="text-[10px] opacity-70 text-[#3A3A3A]"></p>
             </div>
             <div className="flex flex-col items-end gap-1">
               <span className="px-2 py-0.5 rounded-full bg-white/15 border border-white/25 text-[10px] text-[#2F2F2F]">
