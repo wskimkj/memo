@@ -159,7 +159,7 @@ export default function TodoBoard({ todos, setTodos }) {
               ☰
             </button>
             <span className="opacity-80">To Do List</span>
-            <button className="w-5 h-5 rounded-full bg-white/18 flex items-center justify-center">
+            <button className="w-8 h-8 rounded-full bg-white/18 flex items-center justify-center">
             
             </button>
           </div>
