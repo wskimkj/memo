@@ -822,20 +822,6 @@ export default function MemoBoard({
 
   return (
     <aside className="glass p-5 flex flex-col h-full">
-      {/* 상단 타이틀 */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-right text-[11px] text-gray-400">
-          <div>
-            현재 그룹: <span className="font-medium text-gray-700">{activeGroup}</span>
-            {isGroupLocked && (
-              <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
-                🔒 읽기전용
-              </span>
-            )}
-          </div>
-          <div>메모 {currentMemos.length}개</div>
-        </div>
-      </div>
 
       {/* 클립보드 상태 */}
       {clipboardMemo && (
