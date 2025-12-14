@@ -148,7 +148,7 @@ export default function TodoBoard({ todos, setTodos }) {
   }
 
   return (
-    <section className="glass p-4 h-full flex flex-col">
+   <section className="h-full flex flex-col">
       {/* 전체 카드: 오른쪽 영역 높이를 꽉 채우도록 h-full */}
       <div className="w-full h-full rounded-[32px] bg-gradient-to-b from-[#d9d3ff] via-[#f8ddff] to-[#ffc7da] shadow-[0_24px_50px_rgba(148,163,184,0.45)] overflow-hidden flex flex-col">
         {/* 상단 헤더 : 패딩/폰트 줄여서 컴팩트하게 */}
