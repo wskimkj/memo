@@ -1,168 +1,294 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 
-export default function TodoCard() {
-  const [items, setItems] = useState([
-    { id: 1, text: "편집", done: true, starred: false },
-    { id: 2, text: "예시: 환영합니다!", done: true, starred: false },
-  ]);
-  const [value, setValue] = useState("");
+export default function TodoBoard({ todos, setTodos }) {
+  const [newTitle, setNewTitle] = useState("");
 
-  const doneCount = useMemo(() => items.filter(i => i.done).length, [items]);
-  const totalCount = items.length;
+  // edit
+  const [editingId, setEditingId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState("");
 
-  const addItem = () => {
-    const t = value.trim();
-    if (!t) return;
-    setItems(prev => [{ id: Date.now(), text: t, done: false, starred: false }, ...prev]);
-    setValue("");
-  };
+  // long text expand/collapse
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
 
-  const toggleDone = (id) =>
-    setItems(prev => prev.map(i => (i.id === id ? { ...i, done: !i.done } : i)));
+  // 기존 데이터 정규화 (text, done 형태도 지원)
+  const list = (Array.isArray(todos) ? todos : []).map((t) => ({
+    ...t,
+    id: t.id ?? String(t.createdAt ?? Date.now()),
+    title: t.title || t.text || "",
+    done: t.done ?? t.status === "done",
+    favorite: t.favorite ?? false,
+  }));
 
-  const toggleStar = (id) =>
-    setItems(prev => prev.map(i => (i.id === id ? { ...i, starred: !i.starred } : i)));
+  const totalCount = list.length;
+  const doneCount = list.filter((t) => t.done).length;
 
-  const remove = (id) => setItems(prev => prev.filter(i => i.id !== id));
+  const sorted = [...list].sort((a, b) => {
+    if (a.favorite && !b.favorite) return -1;
+    if (!a.favorite && b.favorite) return 1;
+    if (a.done && !b.done) return 1;
+    if (!a.done && b.done) return -1;
+    return 0;
+  });
+
+  // editingId가 목록에서 사라지면 편집 종료
+  useEffect(() => {
+    if (!editingId) return;
+    const exists = list.some((t) => t.id === editingId);
+    if (!exists) {
+      setEditingId(null);
+      setEditingTitle("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.length, editingId]);
+
+  function addTodo() {
+    const title = newTitle.trim();
+    if (!title) return;
+    const now = new Date().toISOString();
+
+    const newTodo = {
+      id: Date.now().toString(),
+      title,
+      text: title,
+      done: false,
+      status: "todo",
+      favorite: false,
+      createdAt: now,
+    };
+
+    setTodos((prev) => {
+      const base = Array.isArray(prev) ? prev : [];
+      return [newTodo, ...base];
+    });
+    setNewTitle("");
+  }
+
+  function toggleDone(id) {
+    setTodos((prev) =>
+      (Array.isArray(prev) ? prev : []).map((t) =>
+        t.id === id
+          ? { ...t, done: !t.done, status: !t.done ? "done" : "todo" }
+          : t
+      )
+    );
+  }
+
+  function toggleFavorite(id) {
+    setTodos((prev) =>
+      (Array.isArray(prev) ? prev : []).map((t) =>
+        t.id === id ? { ...t, favorite: !t.favorite } : t
+      )
+    );
+  }
+
+  function deleteTodo(id) {
+    setTodos((prev) =>
+      (Array.isArray(prev) ? prev : []).filter((t) => t.id !== id)
+    );
+    // expanded에서도 제거
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    // editing이면 종료
+    if (editingId === id) {
+      setEditingId(null);
+      setEditingTitle("");
+    }
+  }
+
+  function startEdit(todo) {
+    setEditingId(todo.id);
+    setEditingTitle(todo.title ?? "");
+    // 편집 시작 시 자동으로 펼쳐서 긴 문장도 바로 보이게
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.add(todo.id);
+      return next;
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditingTitle("");
+  }
+
+  function saveEdit(id) {
+    const nextTitle = editingTitle.trim();
+    if (!nextTitle) {
+      // 빈 값 저장 방지: 취소로 처리(원하면 삭제로 바꿔도 됨)
+      cancelEdit();
+      return;
+    }
+
+    setTodos((prev) =>
+      (Array.isArray(prev) ? prev : []).map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              title: nextTitle,
+              text: nextTitle, // 기존 text 필드도 같이 유지
+            }
+          : t
+      )
+    );
+    setEditingId(null);
+    setEditingTitle("");
+  }
+
+  function toggleExpand(id) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 p-10">
-      {/* soft outer glow */}
-      <div className="relative">
-        <div className="absolute -inset-10 rounded-[40px] bg-gradient-to-br from-indigo-200/60 via-purple-200/50 to-pink-200/60 blur-2xl" />
-        <div className="relative w-[360px] rounded-[36px] bg-white/60 backdrop-blur-xl shadow-[0_30px_80px_rgba(15,23,42,0.18)] ring-1 ring-white/60 p-7">
-          {/* inner card */}
-          <div className="rounded-[28px] bg-gradient-to-br from-indigo-200/55 via-purple-200/55 to-pink-200/55 shadow-[0_18px_40px_rgba(15,23,42,0.12)] ring-1 ring-white/50 p-6">
-            {/* top bar */}
-            <div className="flex items-center justify-between text-white/90">
-              <button className="h-9 w-9 rounded-full bg-white/20 hover:bg-white/25 ring-1 ring-white/25 grid place-items-center transition">
-                <span className="block w-4 h-0.5 bg-white/90 rounded" />
-                <span className="block w-4 h-0.5 bg-white/90 rounded mt-1" />
-                <span className="block w-4 h-0.5 bg-white/90 rounded mt-1" />
-              </button>
+    <section className="glass p-4 h-full flex flex-col">
+      {/* 전체 카드: 오른쪽 영역 높이를 꽉 채우도록 h-full */}
+      <div className="w-full h-full rounded-[32px] bg-gradient-to-b from-[#d9d3ff] via-[#f8ddff] to-[#ffc7da] shadow-[0_24px_50px_rgba(148,163,184,0.45)] overflow-hidden flex flex-col">
+        {/* 상단 헤더 : 패딩/폰트 줄여서 컴팩트하게 */}
+        <div className="px-4 pt-2 pb-2 text-white border-b border-white/15">
+          {/* 작은 탑바 */}
+          <div className="flex items-center justify-between text-[10px] mb-2">
+            <button className="w-5 h-5 rounded-full bg-white/18 flex items-center justify-center">
+              ☰
+            </button>
+            <span className="opacity-80">To Do List</span>
+            <button className="w-5 h-5 rounded-full bg-white/18 flex items-center justify-center">
+              🔍
+            </button>
+          </div>
 
-              <div className="text-sm font-semibold tracking-wide drop-shadow-sm">
-                To Do List
-              </div>
-
-              <button className="h-9 w-9 rounded-full bg-white/20 hover:bg-white/25 ring-1 ring-white/25 grid place-items-center transition">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M21 21l-4.3-4.3m1.3-5.2a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z"
-                    stroke="white"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {/* title + page */}
-            <div className="mt-5 flex items-center justify-between">
-              <div className="text-white font-extrabold text-xl drop-shadow-sm">
+          {/* 제목 + 진행률 (아주 작게) */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight">
                 오늘 할 일
-              </div>
-
-              <div className="px-3 py-1 rounded-full bg-white/20 ring-1 ring-white/25 text-white/90 text-xs font-semibold">
-                {Math.min(doneCount, 2)}/{Math.max(2, totalCount || 2)}
-              </div>
+              </h2>
+              <p className="text-[10px] opacity-75"></p>
             </div>
+            <div className="flex flex-col items-end gap-1">
+              <span className="px-2 py-0.5 rounded-full bg-white/15 border border-white/25 text-[10px]">
+                {doneCount} / {totalCount}
+              </span>
+            </div>
+          </div>
 
-            {/* input pill */}
-            <div className="mt-4 flex items-center gap-3 rounded-full bg-white/20 ring-1 ring-white/30 px-4 py-3">
+          {/* 입력 바 (높이만 딱 맞게) */}
+          <div className="mt-2">
+            <div className="flex items-center rounded-2xl bg-white/12 border border-white/30 px-3 py-1.5 backdrop-blur-md">
               <button
-                onClick={addItem}
-                className="h-9 w-9 rounded-full bg-white/30 hover:bg-white/35 ring-1 ring-white/35 grid place-items-center transition"
-                aria-label="add"
+                onClick={addTodo}
+                className="mr-2 w-5 h-5 rounded-full bg-white/70 text-[#7b5cfa] flex items-center justify-center text-xs font-bold shadow-sm"
               >
-                <span className="text-white text-xl leading-none">+</span>
+                +
               </button>
-
               <input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addItem()}
-                placeholder="Add a task..."
-                className="flex-1 bg-transparent placeholder:text-white/70 text-white outline-none text-sm"
+                className="flex-1 bg-transparent border-none outline-none text-[11px] placeholder:text-white/60 text-white"
+                placeholder="Add a task…"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addTodo();
+                }}
               />
             </div>
-
-            {/* list */}
-            <div className="mt-5 space-y-3">
-              {items.slice(0, 2).map((it) => (
-                <div
-                  key={it.id}
-                  className="flex items-center gap-3 rounded-2xl bg-white/70 ring-1 ring-white/70 px-4 py-3 shadow-[0_10px_18px_rgba(15,23,42,0.08)]"
-                >
-                  <button
-                    onClick={() => toggleDone(it.id)}
-                    className="h-9 w-9 rounded-full bg-indigo-500/90 hover:bg-indigo-500 text-white grid place-items-center shadow-[0_10px_18px_rgba(99,102,241,0.35)] transition"
-                    aria-label="toggle done"
-                  >
-                    {it.done ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M20 6L9 17l-5-5"
-                          stroke="white"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    ) : null}
-                  </button>
-
-                  <div className="flex-1 min-w-0">
-                    <div
-                      className={[
-                        "text-sm font-semibold text-slate-700 truncate",
-                        it.done ? "line-through opacity-70" : "",
-                      ].join(" ")}
-                    >
-                      {it.text}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => toggleStar(it.id)}
-                    className="h-9 w-9 rounded-full hover:bg-slate-100/70 grid place-items-center transition"
-                    aria-label="star"
-                    title="star"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill={it.starred ? "#111827" : "none"}>
-                      <path
-                        d="M12 17.3l-6.2 3.6 1.6-7.1L1.9 9l7.3-.6L12 1.8l2.8 6.6 7.3.6-5.5 4.8 1.6 7.1z"
-                        stroke="#111827"
-                        strokeWidth="1.8"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-
-                  <button
-                    onClick={() => remove(it.id)}
-                    className="h-9 w-9 rounded-full hover:bg-slate-100/70 grid place-items-center transition"
-                    aria-label="remove"
-                    title="remove"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M18 6L6 18M6 6l12 12"
-                        stroke="#111827"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* subtle bottom tint like your mock */}
-            <div className="mt-4 h-10 rounded-2xl bg-gradient-to-r from-pink-200/60 to-purple-200/40" />
           </div>
         </div>
+
+        {/* 리스트 영역 : flex-1 + 스크롤 → 세로 꽉 채우고 목록 길게 */}
+        <div className="flex-1 px-3 pb-3 pt-2 overflow-y-auto space-y-2">
+          {sorted.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-[11px] text-white/80"></div>
+          ) : (
+            sorted.map((t) => {
+              const isEditing = editingId === t.id;
+              const isExpanded = expandedIds.has(t.id);
+
+              return (
+                <motion.div
+                  key={t.id}
+                  whileHover={{ scale: 1.01, y: -2 }}
+                  className="bg-white/95 rounded-2xl shadow-[0_14px_30px_rgba(148,163,184,0.35)] px-3 py-2 flex items-center"
+                >
+                  {/* 체크 동그라미 */}
+                  <button
+                    onClick={() => toggleDone(t.id)}
+                    className={
+                      "w-6 h-6 mr-2 rounded-full border flex items-center justify-center text-[12px] " +
+                      (t.done
+                        ? "bg-[#7b5cfa] border-[#7b5cfa] text-white"
+                        : "border-[#c4b8ff] text-[#7b5cfa] bg-white")
+                    }
+                  >
+                    {t.done && "✓"}
+                  </button>
+
+                  {/* 텍스트 / 편집 */}
+                  <div className="flex-1 min-w-0">
+                    {isEditing ? (
+                      <input
+                        autoFocus
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onBlur={() => saveEdit(t.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit(t.id);
+                          if (e.key === "Escape") cancelEdit();
+                        }}
+                        className={
+                          "w-full bg-transparent border-none outline-none text-[12px] " +
+                          (t.done ? "text-slate-400" : "text-slate-700")
+                        }
+                      />
+                    ) : (
+                      <p
+                        title={t.title} // hover로 전체 확인
+                        onClick={() => toggleExpand(t.id)} // 클릭하면 펼침/접힘
+                        onDoubleClick={() => startEdit(t)} // 더블클릭하면 편집
+                        className={
+                          "text-[12px] cursor-pointer select-none " +
+                          (t.done
+                            ? "text-slate-400 line-through"
+                            : "text-slate-700") +
+                          " " +
+                          (isExpanded
+                            ? "whitespace-normal break-words"
+                            : "truncate")
+                        }
+                      >
+                        {t.title}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 오른쪽 아이콘들 */}
+                  <div className="flex items-center gap-1 ml-2">
+                    <button
+                      onClick={() => toggleFavorite(t.id)}
+                      className="text-[16px]"
+                    >
+                      {t.favorite ? "⭐" : "☆"}
+                    </button>
+                    <button
+                      onClick={() => deleteTodo(t.id)}
+                      className="text-xs text-slate-300 hover:text-rose-400"
+                      title="삭제"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })
+          )}
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
