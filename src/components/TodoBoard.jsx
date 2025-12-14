@@ -152,7 +152,7 @@ export default function TodoBoard({ todos, setTodos }) {
       {/* 전체 카드: 오른쪽 영역 높이를 꽉 채우도록 h-full */}
       <div className="w-full h-full rounded-[32px] bg-gradient-to-b from-[#d9d3ff] via-[#f8ddff] to-[#ffc7da] shadow-[0_24px_50px_rgba(148,163,184,0.45)] overflow-hidden flex flex-col">
         {/* 상단 헤더 : 패딩/폰트 줄여서 컴팩트하게 */}
-        <div className="px-4 pt-2 pb-2 text-white border-b border-white/15">
+        <div className="px-4 pt-2 pb-2 text-[#2F2F2F] border-b border-white/15">
           {/* 작은 탑바 */}
           <div className="flex items-center justify-between text-[10px] mb-2">
             <button className="w-5 h-5 rounded-full bg-white/18 flex items-center justify-center">
@@ -167,13 +167,13 @@ export default function TodoBoard({ todos, setTodos }) {
           {/* 제목 + 진행률 (아주 작게) */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold tracking-tight">
+              <h2 className="text-sm font-semibold tracking-tight text-[#2F2F2F]">
                 오늘 할 일
               </h2>
-              <p className="text-[10px] opacity-75"></p>
+              <p className="text-[10px] opacity-70 text-[#3A3A3A]""></p>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <span className="px-2 py-0.5 rounded-full bg-white/15 border border-white/25 text-[10px]">
+              <span className="px-2 py-0.5 rounded-full bg-white/15 border border-white/25 text-[10px] text-[#2F2F2F]">
                 {doneCount} / {totalCount}
               </span>
             </div>
@@ -189,7 +189,7 @@ export default function TodoBoard({ todos, setTodos }) {
                 +
               </button>
               <input
-                className="flex-1 bg-transparent border-none outline-none text-[11px] placeholder:text-white/60 text-white"
+                className="flex-1 bg-transparent border-none outline-none text-[#2F2F2F] placeholder:text-black/40"
                 placeholder="Add a task…"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
