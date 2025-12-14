@@ -7,10 +7,9 @@ export default function Header({ remaining, total }) {
 
   const today = new Date();
   const dateLabel = today.toLocaleDateString("ko-KR", {
-    year: "numeric",
     month: "long",
     day: "numeric",
-    weekday: "short",
+    (weekday: "short"),
   });
 
   return (
@@ -56,7 +55,7 @@ export default function Header({ remaining, total }) {
       {/* 아래 설명 한 줄 */}
       <div className="text-[11px] text-gray-500 flex items-center justify-between">
         <span>
-          완료{done}개 ·{percent}% 완료
+          완료: {done}개 · {percent}% 달성
         </span>
         {total === 0 && (
           <span className="text-[11px] text-gray-400">
