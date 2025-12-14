@@ -64,14 +64,7 @@ function getGroupColor(name) {
   return GROUP_TAB_COLORS[sum % GROUP_TAB_COLORS.length];
 }
 
-function ToolbarBtn({
-  disabled,
-  onClick,
-  onMouseDown,
-  label,
-  title,
-  className = "",
-}) {
+function ToolbarBtn({ disabled, onClick, onMouseDown, label, title, className = "" }) {
   return (
     <button
       type="button"
@@ -178,7 +171,7 @@ export default function MemoBoard({
     if (draftEditorRef.current) setDraftHtml(draftEditorRef.current.innerHTML);
   }
 
-  // ✅ 핵심: 선택 영역을 span으로 감싸는 유틸(폰트크기 확실 적용)
+  // ✅ 선택영역 span 래핑 (폰트크기 확실 적용)
   function wrapSelectionWithSpanStyle(styleObj) {
     const editor = draftEditorRef.current;
     if (!editor) return;
@@ -193,18 +186,15 @@ export default function MemoBoard({
     const wrapper = document.createElement("span");
     Object.assign(wrapper.style, styleObj);
 
-    // 선택된 HTML 얻기
     const frag = range.cloneContents();
     const tmp = document.createElement("div");
     tmp.appendChild(frag);
     const selectedHtml = tmp.innerHTML;
 
-    // 선택이 비어있으면(커서만 있는 상태) span 삽입 후 커서 이동
     if (!selectedHtml) {
       wrapper.innerHTML = "&nbsp;";
       range.insertNode(wrapper);
 
-      // 커서를 span 뒤로
       const newRange = document.createRange();
       newRange.setStartAfter(wrapper);
       newRange.collapse(true);
@@ -216,12 +206,10 @@ export default function MemoBoard({
       return;
     }
 
-    // 선택 영역 교체
     range.deleteContents();
     wrapper.innerHTML = selectedHtml;
     range.insertNode(wrapper);
 
-    // 커서를 wrapper 뒤로
     const newRange = document.createRange();
     newRange.setStartAfter(wrapper);
     newRange.collapse(true);
@@ -232,7 +220,6 @@ export default function MemoBoard({
     setDraftHtml(editor.innerHTML);
   }
 
-  // ✅ 폰트 px 적용 (확실 버전)
   function applyFontSizePx(px) {
     if (isGroupLocked) return;
     wrapSelectionWithSpanStyle({ fontSize: `${px}px` });
@@ -283,7 +270,6 @@ export default function MemoBoard({
     if (draftEditorRef.current) setDraftHtml(draftEditorRef.current.innerHTML);
   }
 
-  // ✅ 드롭다운 열기: onMouseDown에서만 (closeAll 충돌 방지)
   function openFloatingMenu(setter) {
     return (e) => {
       e.preventDefault();
@@ -302,6 +288,9 @@ export default function MemoBoard({
     };
   }
 
+  // =========================
+  // Draft 삽입 도구
+  // =========================
   function handleInsertLinkToDraft() {
     const url = window.prompt("링크 URL을 입력하세요");
     if (url) applyDraftFormat("createLink", url);
@@ -346,7 +335,7 @@ export default function MemoBoard({
   }
 
   // =========================
-  // ✅ 메뉴 닫기: click → mousedown 으로 변경 (드롭다운 즉시닫힘 해결)
+  // 메뉴 닫기 (mousedown)
   // =========================
   useEffect(() => {
     const closeAll = () => {
@@ -379,7 +368,7 @@ export default function MemoBoard({
   }, [activeGroup, editingMemoId, editingMemoGroup]);
 
   // =========================
-  // 그룹 CRUD (원본 그대로)
+  // 그룹 CRUD
   // =========================
   function createGroup() {
     const g = newGroup.trim();
@@ -451,9 +440,7 @@ export default function MemoBoard({
 
     if (activeGroup === name) setActiveGroup(targetGroup);
 
-    if (editingMemoGroup === name) {
-      clearDraft();
-    }
+    if (editingMemoGroup === name) clearDraft();
   }
 
   function startEditGroup(name) {
@@ -603,6 +590,17 @@ export default function MemoBoard({
     });
   }
 
+  function updateMemoHtml(id, html) {
+    const plain = htmlToPlain(html);
+    setMemos((prev) => {
+      const copy = { ...prev };
+      copy[activeGroup] = (copy[activeGroup] || []).map((m) =>
+        m.id === id ? { ...m, html, text: plain } : m
+      );
+      return copy;
+    });
+  }
+
   function updateMemoColor(id, color) {
     setMemos((prev) => {
       const copy = { ...prev };
@@ -649,6 +647,9 @@ export default function MemoBoard({
     }, 0);
   }
 
+  // =========================
+  // 클립보드
+  // =========================
   function copyMemo(memo) {
     setClipboardMemo({
       mode: "copy",
@@ -683,7 +684,7 @@ export default function MemoBoard({
     const plain = htmlToPlain(base.html || base.text || "");
     const nextMemo = {
       id: newId,
-      title: base.title || plain.slice(0, 30),
+      title: base.title || plain.slice(0, 30) || "제목 없음",
       text: plain,
       html: base.html || plainToHtml(plain),
       createdAt: new Date().toISOString(),
@@ -700,14 +701,30 @@ export default function MemoBoard({
     if (clipboardMemo.mode === "cut") setClipboardMemo(null);
   }
 
+  // ✅ “텍스트가 없어도(표/이미지/체크박스)” 저장되게
+  function hasRichContent(html) {
+    const h = (html || "").toLowerCase();
+    return (
+      h.includes("<img") ||
+      h.includes("<table") ||
+      h.includes("<input") ||
+      h.includes("<ul") ||
+      h.includes("<ol") ||
+      h.includes("<li") ||
+      h.includes("<a ")
+    );
+  }
+
   function upsertMemoFromDraft() {
     if (isGroupLocked) return;
 
-    const html = (draftHtml || "").trim();
+    const html = (draftEditorRef.current?.innerHTML ?? draftHtml ?? "").trim();
     const plain = htmlToPlain(html);
-    if (!plain) return;
 
-    const firstLine = plain.split("\n")[0] || "";
+    // 텍스트도 없고, 표/이미지 같은 것도 없으면 저장 안함
+    if (!plain && !hasRichContent(html)) return;
+
+    const firstLine = (plain.split("\n")[0] || "").trim();
     const group = activeGroup || groups[0] || "기본";
 
     if (editingMemoId && editingMemoGroup) {
@@ -718,7 +735,12 @@ export default function MemoBoard({
         const list = copy[targetGroup] || [];
         copy[targetGroup] = list.map((m) =>
           m.id === editingMemoId
-            ? { ...m, html, text: plain, title: m.title || firstLine.slice(0, 30) }
+            ? {
+                ...m,
+                html,
+                text: plain,
+                title: (m.title || firstLine || "제목 없음").slice(0, 30),
+              }
             : m
         );
         return copy;
@@ -730,7 +752,7 @@ export default function MemoBoard({
 
     const nextMemo = {
       id: Date.now().toString(),
-      title: firstLine.slice(0, 30),
+      title: (firstLine || "제목 없음").slice(0, 30),
       text: plain,
       html,
       createdAt: new Date().toISOString(),
@@ -749,6 +771,9 @@ export default function MemoBoard({
     if (draftEditorRef.current) draftEditorRef.current.innerHTML = "";
   }
 
+  // =========================
+  // 우클릭 메뉴 위치
+  // =========================
   function openGroupMenu(e, groupName) {
     e.preventDefault();
     e.stopPropagation();
@@ -793,9 +818,12 @@ export default function MemoBoard({
     return !!el;
   }
 
+  // =========================
+  // UI
+  // =========================
   return (
     <aside className="glass p-5 flex flex-col h-full">
-      {/* 상단 타이틀 */}
+      {/* 상단 */}
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-800">메모 보드</h2>
@@ -813,7 +841,7 @@ export default function MemoBoard({
         </div>
       </div>
 
-      {/* 클립보드 상태 */}
+      {/* 클립보드 */}
       {clipboardMemo && (
         <div className="mb-3 flex items-center justify-between rounded-xl border border-dashed border-amber-300/80 bg-amber-50/70 px-3 py-2 text-[11px] text-amber-800">
           <span>
@@ -837,7 +865,7 @@ export default function MemoBoard({
         </div>
       )}
 
-      {/* 그룹 탭 바 */}
+      {/* 그룹 탭 */}
       <div className="mb-4">
         <div className="relative">
           <div className="h-7 bg-white/90 rounded-t-md border border-gray-200 border-b-0" />
@@ -934,9 +962,241 @@ export default function MemoBoard({
         </div>
       </div>
 
-      {/* (중간: 그룹/메모 우클릭 메뉴 + 메모 리스트는 네 코드와 동일하게 유지되어 있음)
-          여기서는 핵심 버그(드롭다운/폰트크기) 수정 부분이 툴바+드롭다운이라
-          아래에 새 메모 입력 카드/툴바 부분만 그대로 포함 */}
+      {/* 그룹 우클릭 메뉴 */}
+      {groupMenu.open && (
+        <div
+          className="fixed z-[9999] w-64 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden"
+          style={{ left: groupMenu.x, top: groupMenu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-2 text-[11px] text-gray-500 border-b bg-gray-50">
+            그룹: <span className="font-medium text-gray-800">{groupMenu.group}</span>
+            {lockedGroups[groupMenu.group] && (
+              <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                🔒 읽기전용
+              </span>
+            )}
+          </div>
+
+          <div className="px-2 py-2 flex gap-2">
+            <button
+              className="flex-1 px-2 py-2 rounded-lg border hover:bg-gray-50 text-sm"
+              onClick={() => {
+                moveGroup(groupMenu.group, "up");
+                setGroupMenu({ open: false, x: 0, y: 0, group: null });
+              }}
+            >
+              ⬅/⬆ 위로
+            </button>
+            <button
+              className="flex-1 px-2 py-2 rounded-lg border hover:bg-gray-50 text-sm"
+              onClick={() => {
+                moveGroup(groupMenu.group, "down");
+                setGroupMenu({ open: false, x: 0, y: 0, group: null });
+              }}
+            >
+              ➡/⬇ 아래로
+            </button>
+          </div>
+
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t"
+            onClick={() => {
+              copySectionLink(groupMenu.group);
+              setGroupMenu({ open: false, x: 0, y: 0, group: null });
+            }}
+          >
+            🔗 섹션 링크 복사
+          </button>
+
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+            onClick={() => {
+              toggleGroupLock(groupMenu.group);
+              setGroupMenu({ open: false, x: 0, y: 0, group: null });
+            }}
+          >
+            {lockedGroups[groupMenu.group] ? "🔓 잠금 해제" : "🔒 그룹 잠금(읽기전용)"}
+          </button>
+
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t"
+            onClick={() => {
+              startEditGroup(groupMenu.group);
+              setGroupMenu({ open: false, x: 0, y: 0, group: null });
+            }}
+          >
+            ✏️ 이름 바꾸기
+          </button>
+
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+            onClick={() => {
+              duplicateGroup(groupMenu.group);
+              setGroupMenu({ open: false, x: 0, y: 0, group: null });
+            }}
+          >
+            📄 그룹 복사(복제)
+          </button>
+
+          <div className="px-3 py-2 border-t">
+            <div className="text-[11px] text-gray-500 mb-2">색상 변경</div>
+            <div className="flex flex-wrap gap-1">
+              {GROUP_TAB_COLORS.map((c) => (
+                <button
+                  key={c}
+                  className="w-5 h-5 rounded-full border border-black/10"
+                  style={{ backgroundColor: c }}
+                  onClick={() => {
+                    setGroupColor(groupMenu.group, c);
+                    setGroupMenu({ open: false, x: 0, y: 0, group: null });
+                  }}
+                />
+              ))}
+              <button
+                className="ml-auto text-[11px] px-2 py-1 rounded-md border hover:bg-gray-50"
+                onClick={() => {
+                  setGroupColorOverrides((prev) => {
+                    const next = { ...prev };
+                    delete next[groupMenu.group];
+                    return next;
+                  });
+                  setGroupMenu({ open: false, x: 0, y: 0, group: null });
+                }}
+              >
+                초기화
+              </button>
+            </div>
+          </div>
+
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-red-50 text-red-600 border-t"
+            onClick={() => {
+              deleteGroup(groupMenu.group);
+              setGroupMenu({ open: false, x: 0, y: 0, group: null });
+            }}
+          >
+            🗑 그룹 삭제
+          </button>
+        </div>
+      )}
+
+      {/* 메모 우클릭 메뉴 */}
+      {memoMenu.open && memoMenuTarget && (
+        <div
+          className="fixed z-[9999] w-64 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden"
+          style={{ left: memoMenu.x, top: memoMenu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-2 text-[11px] text-gray-500 border-b bg-gray-50">
+            메모: <span className="font-medium text-gray-800">{memoMenuTarget.title || "제목 없음"}</span>
+          </div>
+
+          <button
+            disabled={isGroupLocked}
+            className={
+              "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 " +
+              (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+            }
+            onClick={() => {
+              if (isGroupLocked) return;
+              loadMemoToDraft(memoMenuTarget);
+              setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
+            }}
+          >
+            ✏️ 편집(메인으로)
+          </button>
+
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t"
+            onClick={() => {
+              copyMemo(memoMenuTarget);
+              setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
+            }}
+          >
+            📄 복사
+          </button>
+
+          <button
+            disabled={isGroupLocked}
+            className={
+              "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 " +
+              (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+            }
+            onClick={() => {
+              if (isGroupLocked) return;
+              cutMemo(memoMenuTarget);
+              setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
+            }}
+          >
+            ✂️ 잘라내기
+          </button>
+
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+            onClick={() => {
+              pasteClipboardToActiveGroup();
+              setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
+            }}
+          >
+            📋 붙여넣기
+          </button>
+
+          <div className="px-3 py-2 border-t">
+            <div className="text-[11px] text-gray-500 mb-2">메모 색상</div>
+            <div className="flex flex-wrap gap-1">
+              {PASTEL_NOTE_COLORS.map((c) => (
+                <button
+                  key={c}
+                  className="w-5 h-5 rounded-full border border-black/10"
+                  style={{ backgroundColor: c }}
+                  onClick={() => {
+                    updateMemoColor(memoMenuTarget.id, c);
+                    setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="px-3 py-2 border-t">
+            <div className="text-[11px] text-gray-500 mb-2">다른 그룹으로 이동</div>
+            <div className="flex flex-wrap gap-1">
+              {groups
+                .filter((g) => g !== activeGroup)
+                .slice(0, 10)
+                .map((g) => (
+                  <button
+                    key={g}
+                    className="px-2 py-1 rounded-md border text-[11px] hover:bg-gray-50"
+                    onClick={() => {
+                      moveMemoToGroup(memoMenuTarget.id, g);
+                      setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
+                    }}
+                  >
+                    {g}
+                  </button>
+                ))}
+            </div>
+          </div>
+
+          <button
+            disabled={isGroupLocked}
+            className={
+              "w-full text-left px-3 py-2 text-sm hover:bg-red-50 text-red-600 border-t " +
+              (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+            }
+            onClick={() => {
+              if (isGroupLocked) return;
+              removeMemo(memoMenuTarget.id);
+              setMemoMenu({ open: false, x: 0, y: 0, memoId: null });
+            }}
+          >
+            🗑 메모 삭제
+          </button>
+        </div>
+      )}
+
       {/* 새 메모 입력 카드 */}
       <div className="mb-4">
         <div className="rounded-2xl border border-gray-200/70 bg-white/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(15,23,42,0.08)] overflow-hidden">
@@ -1033,7 +1293,7 @@ export default function MemoBoard({
 
               <div className="mx-1 h-6 w-px bg-gray-200" />
 
-              {/* ✅ 여기 핵심: 드롭다운은 onMouseDown으로 열기 */}
+              {/* 드롭다운 */}
               <ToolbarBtn
                 disabled={isGroupLocked}
                 onMouseDown={openFloatingMenu(setTextColorMenu)}
@@ -1053,12 +1313,12 @@ export default function MemoBoard({
             </div>
           </div>
 
-          {/* ✅ 글자색 드롭다운 */}
+          {/* 글자색 드롭다운 */}
           {textColorMenu.open && (
             <div
               className="fixed z-[9999] w-64 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden"
               style={{ left: textColorMenu.x, top: textColorMenu.y }}
-              onMouseDown={(e) => e.stopPropagation()} // ✅ 바깥 mousedown 닫기 방지
+              onMouseDown={(e) => e.stopPropagation()}
             >
               <div className="px-3 py-2 text-[11px] text-gray-500 border-b bg-gray-50">글자색</div>
               <div className="p-2 flex flex-wrap gap-2">
@@ -1088,12 +1348,12 @@ export default function MemoBoard({
             </div>
           )}
 
-          {/* ✅ 하이라이트 드롭다운 */}
+          {/* 하이라이트 드롭다운 */}
           {highlightMenu.open && (
             <div
               className="fixed z-[9999] w-64 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden"
               style={{ left: highlightMenu.x, top: highlightMenu.y }}
-              onMouseDown={(e) => e.stopPropagation()} // ✅ 바깥 mousedown 닫기 방지
+              onMouseDown={(e) => e.stopPropagation()}
             >
               <div className="px-3 py-2 text-[11px] text-gray-500 border-b bg-gray-50">하이라이트</div>
               <div className="p-2 flex flex-wrap gap-2">
@@ -1166,8 +1426,176 @@ export default function MemoBoard({
         </div>
       </div>
 
-      {/* 아래 메모리스트/우클릭메뉴는 네가 붙여넣은 원본 부분 그대로 두면 됨 */}
-      {/* (너 코드가 길어서 여기선 생략했는데, 너가 올린 파일에는 이미 존재하니까 그대로 유지) */}
+      {/* ✅ 메모 리스트 (이거 빠져서 “저장 안됨”처럼 보였던 케이스 많음) */}
+      <div className="flex-1 flex flex-col">
+        {currentMemos.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-xs text-gray-400 text-center px-4">
+            아직 메모가 없어요.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+            {currentMemos.map((m) => {
+              const contentHtml = m.html || (m.text ? plainToHtml(m.text) : "");
+              const color = m.color || getRandomColor();
+              const isEditingThis = editingMemoId === m.id && editingMemoGroup === activeGroup;
+
+              return (
+                <motion.div
+                  key={m.id}
+                  whileHover={{ scale: 1.02, translateY: -2 }}
+                  className={
+                    "relative rounded-xl shadow-md border overflow-hidden cursor-grab active:cursor-grabbing " +
+                    (isEditingThis ? "border-amber-500/70 ring-2 ring-amber-300/60" : "border-black/5")
+                  }
+                  style={{ backgroundColor: color }}
+                  draggable
+                  onDragStart={(e) => {
+                    if (shouldBlockDragStart(e.target)) {
+                      e.preventDefault();
+                      return;
+                    }
+                    setDraggingMemoId(m.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggingMemoId(null);
+                    setMemoDragOverGroup(null);
+                  }}
+                  onContextMenu={(e) => openMemoMenu(e, m.id)}
+                >
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-16 h-2 rounded-b-full bg-white/70 shadow" />
+
+                  {isEditingThis && (
+                    <div className="absolute left-2 top-2 text-[10px] px-2 py-0.5 rounded-full bg-white/70 border border-amber-200 text-amber-800">
+                      ✏️ 편집중
+                    </div>
+                  )}
+
+                  <div className="px-3 pt-3 pb-2 flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <input
+                        value={m.title || ""}
+                        onChange={(e) => updateMemoTitle(m.id, e.target.value)}
+                        placeholder="제목"
+                        disabled={isGroupLocked}
+                        className={
+                          "w-full text-xs font-semibold text-gray-900 bg-transparent border-b border-white/60 focus:outline-none focus:border-gray-700 pb-0.5 placeholder:text-gray-400 " +
+                          (isGroupLocked ? "opacity-60 cursor-not-allowed" : "")
+                        }
+                      />
+                    </div>
+
+                    <div className="flex gap-1 absolute top-1 right-1">
+                      <button
+                        disabled={isGroupLocked}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isGroupLocked) return;
+                          loadMemoToDraft(m);
+                        }}
+                        className={
+                          "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px] " +
+                          (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+                        }
+                        title="메인 편집기에서 서식 편집"
+                      >
+                        ✏️
+                      </button>
+
+                      <button
+                        disabled={isGroupLocked}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isGroupLocked) return;
+                          setColorPickerFor((prev) => (prev === m.id ? null : m.id));
+                        }}
+                        className={
+                          "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white text-[12px] " +
+                          (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+                        }
+                        title="색상 변경"
+                      >
+                        🎨
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyMemo(m);
+                        }}
+                        className="px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white"
+                        title="복사"
+                      >
+                        📄
+                      </button>
+
+                      <button
+                        disabled={isGroupLocked}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isGroupLocked) return;
+                          removeMemo(m.id);
+                        }}
+                        className={
+                          "px-1.5 py-0.5 rounded-full bg-white/70 border border-gray-200 hover:bg-white " +
+                          (isGroupLocked ? "opacity-40 cursor-not-allowed" : "")
+                        }
+                        title="삭제"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {colorPickerFor === m.id && (
+                      <div
+                        className="absolute top-7 right-0 z-20 rounded-xl bg-white shadow-lg border border-gray-200 px-2 py-2 flex flex-wrap gap-1 w-32"
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {PASTEL_NOTE_COLORS.map((c) => (
+                          <button
+                            key={c}
+                            onClick={() => {
+                              updateMemoColor(m.id, c);
+                              setColorPickerFor(null);
+                            }}
+                            className="w-5 h-5 rounded-full border border-black/10 focus:outline-none"
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="px-3 pb-2">
+                    <div
+                      className={
+                        "text-[11px] leading-relaxed rounded-md px-2 py-2 max-h-40 overflow-y-auto bg-white/30 " +
+                        (isGroupLocked ? "opacity-70 cursor-not-allowed" : "")
+                      }
+                      onContextMenu={(e) => openMemoMenu(e, m.id)}
+                      dangerouslySetInnerHTML={{ __html: contentHtml }}
+                    />
+                  </div>
+
+                  <div className="px-3 pb-3 flex items-center justify-between gap-2 text-[11px] text-gray-600">
+                    {m.createdAt && (
+                      <span className="text-[10px] text-gray-500">
+                        {new Date(m.createdAt).toLocaleString("ko-KR", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        작성
+                      </span>
+                    )}
+                    <span className="text-[10px] text-gray-500">우클릭 메뉴 사용 가능</span>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </aside>
   );
 }
@@ -1183,6 +1611,8 @@ function htmlToPlain(html) {
   s = s.replace(/<\/li>/gi, "\n");
   s = s.replace(/<li[^>]*>/gi, "• ");
 
+  // 이미지/체크박스/표 같은 건 텍스트가 비어도 저장 가능하게 했으니
+  // 여기서는 "텍스트 추출"만 최대한 단순하게
   s = s.replace(/<[^>]+>/g, "");
   s = s.replace(/&nbsp;/g, " ");
 
@@ -1190,7 +1620,6 @@ function htmlToPlain(html) {
   return s.trim();
 }
 
-/** plain -> html */
 function plainToHtml(text) {
   const safe = (text || "")
     .replace(/&/g, "&amp;")
