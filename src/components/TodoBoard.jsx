@@ -159,11 +159,17 @@ export default function TodoBoard({ todos, setTodos }) {
               ☰
             </button>
             <span className="opacity-80">To Do List</span>
+            <button className="w-5 h-5 rounded-full bg-white/18 flex items-center justify-center">
+              🔍
+            </button>
           </div>
 
           {/* 제목 + 진행률 (아주 작게) */}
           <div className="flex items-center justify-between">
             <div>
+              <h2 className="text-sm font-semibold tracking-tight text-[#2F2F2F]">
+                오늘 할 일
+              </h2>
               <p className="text-[10px] opacity-70 text-[#3A3A3A]"></p>
             </div>
             <div className="flex flex-col items-end gap-1">
@@ -178,7 +184,7 @@ export default function TodoBoard({ todos, setTodos }) {
             <div className="flex items-center rounded-2xl bg-white/12 border border-white/30 px-3 py-1.5 backdrop-blur-md">
               <button
                 onClick={addTodo}
-                className="mr-2 w-3 h-3 rounded-full bg-white/70 text-[#7b5cfa] flex items-center justify-center text-xs font-bold shadow-sm"
+                className="mr-2 w-5 h-5 rounded-full bg-white/70 text-[#7b5cfa] flex items-center justify-center text-xs font-bold shadow-sm"
               >
                 +
               </button>
