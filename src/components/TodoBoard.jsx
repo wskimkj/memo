@@ -159,7 +159,7 @@ export default function TodoBoard({ todos, setTodos }) {
               ☰
             </button>
             <span className="opacity-80">To Do List</span>
-            <button className="w-5 h-5 rounded-full bg-white/18 flex items-center justify-center">
+            <button className="w-7 h-7 rounded-full bg-white/18 flex items-center justify-center">
               🔍
             </button>
           </div>
@@ -181,7 +181,7 @@ export default function TodoBoard({ todos, setTodos }) {
             <div className="flex items-center rounded-2xl bg-white/12 border border-white/30 px-3 py-1.5 backdrop-blur-md">
               <button
                 onClick={addTodo}
-                className="mr-2 w-5 h-5 rounded-full bg-white/70 text-[#7b5cfa] flex items-center justify-center text-xs font-bold shadow-sm"
+                className="mr-2 w-3 h-3 rounded-full bg-white/70 text-[#7b5cfa] flex items-center justify-center text-xs font-bold shadow-sm"
               >
                 +
               </button>
