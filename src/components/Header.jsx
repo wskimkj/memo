@@ -19,12 +19,12 @@ export default function Header({ remaining, total }) {
       <div className="flex items-center justify-between text-[11px] text-gray-500">
         <div className="flex items-center gap-2">
           <span className="px-2 py-0.5 rounded-full bg-white/70 border border-white/60 shadow-sm">
-            오늘 · {dateLabel}
+          {dateLabel}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <span>
-            남은 할 일{" "}
+           할 일{" "}
             <span className="font-semibold text-violet-600">
               {remaining}
             </span>{" "}
@@ -56,7 +56,7 @@ export default function Header({ remaining, total }) {
       {/* 아래 설명 한 줄 */}
       <div className="text-[11px] text-gray-500 flex items-center justify-between">
         <span>
-          완료된 작업 {done}개 · 진행률 {percent}%
+          완료{done}개 ·{percent}% 완료
         </span>
         {total === 0 && (
           <span className="text-[11px] text-gray-400">
