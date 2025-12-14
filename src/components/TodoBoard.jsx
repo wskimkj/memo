@@ -159,9 +159,6 @@ export default function TodoBoard({ todos, setTodos }) {
               ☰
             </button>
             <span className="opacity-80">To Do List</span>
-            <button className="w-7 h-7 rounded-full bg-white/18 flex items-center justify-center">
-              🔍
-            </button>
           </div>
 
           {/* 제목 + 진행률 (아주 작게) */}
